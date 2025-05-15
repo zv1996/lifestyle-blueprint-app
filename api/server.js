@@ -22,22 +22,40 @@ app.use(cors({
   // Allow requests from any origin in development
   // In production, you should specify your PHP hosted domain
   origin: function(origin, callback) {
+    // Log the origin for debugging
+    console.log('Request origin:', origin);
+    
     // In development, allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('Allowing request with no origin');
+      return callback(null, true);
+    }
     
     // Allow requests from localhost in development
     if (origin.match(/^https?:\/\/localhost(:[0-9]+)?$/)) {
+      console.log('Allowing localhost request');
+      return callback(null, true);
+    }
+    
+    // Allow requests from file:// protocol during development
+    if (origin.match(/^file:\/\//)) {
+      console.log('Allowing file:// protocol request');
       return callback(null, true);
     }
     
     // Add your production domain here
     const allowedDomains = [
-      'https://phpstack-718927-5513557.cloudwaysapps.com'
+      'https://phpstack-718927-5513557.cloudwaysapps.com',
+      'https://lifestyle-blueprint-app.onrender.com'
     ];
     
+    console.log('Checking against allowed domains:', allowedDomains);
+    
     if (allowedDomains.length === 0 || allowedDomains.indexOf(origin) !== -1) {
+      console.log('Origin is in allowed domains list');
       callback(null, true);
     } else {
+      console.log('Origin is NOT in allowed domains list');
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -418,6 +436,46 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     version: '1.0.0'
   });
+});
+
+// Database connection test endpoint
+app.get('/api/test-db', async (req, res) => {
+  try {
+    console.log('Testing database connection...');
+    console.log('Supabase URL:', process.env.SUPABASE_URL ? 'URL is set' : 'URL is missing');
+    console.log('Supabase Key:', process.env.SUPABASE_SERVICE_KEY ? 'Key is set' : 'Key is missing');
+    
+    // Try to query the users table
+    const { data, error } = await dbClient.supabase
+      .from('users')
+      .select('*')
+      .limit(1);
+    
+    if (error) {
+      console.error('Error connecting to database:', error);
+      return res.status(500).json({ 
+        error: 'Database connection error', 
+        details: error.message,
+        supabaseUrl: process.env.SUPABASE_URL ? 'URL is set' : 'URL is missing',
+        supabaseKey: process.env.SUPABASE_SERVICE_KEY ? 'Key is set' : 'Key is missing'
+      });
+    }
+    
+    // Return success response
+    res.status(200).json({
+      status: 'Database connection successful',
+      timestamp: new Date().toISOString(),
+      data: data || null
+    });
+  } catch (error) {
+    console.error('Unexpected error testing database:', error);
+    res.status(500).json({ 
+      error: 'Unexpected error', 
+      details: error.message,
+      supabaseUrl: process.env.SUPABASE_URL ? 'URL is set' : 'URL is missing',
+      supabaseKey: process.env.SUPABASE_SERVICE_KEY ? 'Key is set' : 'Key is missing'
+    });
+  }
 });
 
 // API endpoint to get all user data

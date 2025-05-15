@@ -756,5 +756,6 @@ module.exports = {
   storeGroceryList,
   finalizeMealPlan,
   storeConversationMessage,
-  getAllUserData
+  getAllUserData,
+  supabase // Export the Supabase client for testing
 };
