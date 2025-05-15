@@ -32,8 +32,7 @@ app.use(cors({
     
     // Add your production domain here
     const allowedDomains = [
-      // Example: 'https://your-php-domain.com'
-      // Add your actual domain when deploying
+      'https://phpstack-718927-5513557.cloudwaysapps.com'
     ];
     
     if (allowedDomains.length === 0 || allowedDomains.indexOf(origin) !== -1) {
