@@ -411,6 +411,16 @@ app.put('/api/meal-plan/:mealPlanId/approve', async (req, res) => {
   }
 });
 
+// Health check endpoint for testing connectivity
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    version: '1.0.0'
+  });
+});
+
 // API endpoint to get all user data
 app.get('/api/user/:userId/data', async (req, res) => {
   try {
