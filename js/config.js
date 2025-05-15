@@ -17,8 +17,8 @@ const config = {
     if (config.isDevelopment()) {
       return 'http://localhost:3001'; // Local development API
     } else {
-      // Replace this URL with your Render.com backend URL once deployed
-      return 'https://lifestyle-blueprint-api.onrender.com'; // Production API
+      // Production API URL from Render.com
+      return 'https://lifestyle-blueprint-app.onrender.com'; // Production API
     }
   }
 };
