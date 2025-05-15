@@ -1,5 +1,5 @@
 // Production Service Worker for Lifestyle Blueprint App
-const CACHE_VERSION = '3';
+const CACHE_VERSION = '4';
 const CACHE_NAME = `lifestyle-blueprint-v${CACHE_VERSION}`;
 
 // Assets to cache for offline use
@@ -29,6 +29,7 @@ const urlsToCache = [
   '/js/meal-plan-creator.js',
   '/js/meal-plan-overlay.js',
   '/js/metrics-goals-collector.js',
+  '/js/config.js',
   '/images/logo.svg',
   '/images/favicon.ico',
   '/images/icon-192x192.png',
@@ -88,8 +89,21 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Skip API requests
+  // Skip API requests - let them go directly to network
   if (url.pathname.startsWith('/api/')) {
+    // For API requests, use network-only strategy
+    event.respondWith(
+      fetch(event.request)
+        .catch(error => {
+          console.error('API fetch failed:', error);
+          return new Response(JSON.stringify({ 
+            error: 'You appear to be offline. Please check your connection.' 
+          }), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 503
+          });
+        })
+    );
     return;
   }
 
@@ -116,7 +130,8 @@ self.addEventListener('fetch', event => {
               if (cachedResponse) {
                 return cachedResponse;
               }
-              // If not in cache, try to serve the offline page
+              // If not in cache, serve the offline page
+              console.log('Network failed, serving cached index.html as fallback');
               return caches.match('/index.html');
             });
         })
@@ -154,23 +169,73 @@ self.addEventListener('fetch', event => {
           })
           .catch(error => {
             console.error('Fetch failed:', error);
-            // You could return a custom offline asset here if needed
+            // For images, return a placeholder if available
+            if (event.request.url.match(/\.(jpg|jpeg|png|gif|svg)$/)) {
+              return caches.match('/images/lifestyle-blueprint-logo-icon.png');
+            }
+            // For CSS/JS, just log the error - the page will handle missing resources
+            return new Response('/* Resource unavailable while offline */', {
+              headers: { 'Content-Type': 'text/plain' },
+              status: 503
+            });
           });
       })
   );
 });
 
-// Add a message handler for manual cache clearing
+// Add a message handler for cache management
 self.addEventListener('message', event => {
-  if (event.data && event.data.action === 'CLEAR_CACHES') {
+  if (event.data) {
+    // Handle cache clearing
+    if (event.data.action === 'CLEAR_CACHES') {
+      event.waitUntil(
+        caches.keys().then(cacheNames => {
+          return Promise.all(
+            cacheNames.map(cacheName => {
+              console.log('Manually clearing cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+          ).then(() => {
+            // Notify the client that caches were cleared
+            if (event.source) {
+              event.source.postMessage({
+                action: 'CACHES_CLEARED',
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+        })
+      );
+    }
+    
+    // Handle cache update request
+    if (event.data.action === 'UPDATE_CACHE') {
+      event.waitUntil(
+        caches.open(CACHE_NAME).then(cache => {
+          console.log('Updating cache with latest assets');
+          return cache.addAll(urlsToCache).then(() => {
+            // Notify the client that cache was updated
+            if (event.source) {
+              event.source.postMessage({
+                action: 'CACHE_UPDATED',
+                version: CACHE_VERSION,
+                timestamp: new Date().toISOString()
+              });
+            }
+          });
+        })
+      );
+    }
+  }
+});
+
+// Periodic cache update (every 24 hours)
+self.addEventListener('periodicsync', event => {
+  if (event.tag === 'update-cache') {
     event.waitUntil(
-      caches.keys().then(cacheNames => {
-        return Promise.all(
-          cacheNames.map(cacheName => {
-            console.log('Manually clearing cache:', cacheName);
-            return caches.delete(cacheName);
-          })
-        );
+      caches.open(CACHE_NAME).then(cache => {
+        console.log('Periodic sync: updating cache with latest assets');
+        return cache.addAll(urlsToCache);
       })
     );
   }
