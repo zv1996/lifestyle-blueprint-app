@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        #apiUrl {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <h1>Backend Connection Test</h1>
+    
+    <div class="card">
+        <h2>Configuration</h2>
+        <p>Enter the URL of your backend API:</p>
+        <input type="text" id="apiUrl" placeholder="https://your-backend-url.onrender.com" />
+        <p>
+            <button id="testLocalButton">Test Local Connection</button>
+            <button id="testProductionButton">Test Production Connection</button>
+        </p>
+    </div>
+    
+    <div class="card">
+        <h2>Results</h2>
+        <div id="results">
+            <p>Click one of the test buttons above to check your connection.</p>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>How to Use</h2>
+        <ol>
+            <li>Enter your backend API URL in the input field above.</li>
+            <li>Click "Test Local Connection" to test the connection to localhost:3001.</li>
+            <li>Click "Test Production Connection" to test the connection to your production backend.</li>
+            <li>Check the results to see if the connection was successful.</li>
+        </ol>
+        <p>If the connection fails, check the following:</p>
+        <ul>
+            <li>Verify that your backend server is running.</li>
+            <li>Check that CORS is properly configured in your backend.</li>
+            <li>Ensure the URL is correct and includes the protocol (http:// or https://).</li>
+        </ul>
+    </div>
+
+    <script type="module">
+        import config from './js/config.js';
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const apiUrlInput = document.getElementById('apiUrl');
+            const testLocalButton = document.getElementById('testLocalButton');
+            const testProductionButton = document.getElementById('testProductionButton');
+            const resultsDiv = document.getElementById('results');
+            
+            // Set the default API URL from config
+            try {
+                apiUrlInput.value = config.isDevelopment() 
+                    ? 'http://localhost:3001' 
+                    : config.getApiBaseUrl();
+            } catch (error) {
+                console.error('Error loading config:', error);
+                apiUrlInput.value = 'http://localhost:3001';
+            }
+            
+            testLocalButton.addEventListener('click', function() {
+                testConnection('http://localhost:3001');
+            });
+            
+            testProductionButton.addEventListener('click', function() {
+                const apiUrl = apiUrlInput.value.trim();
+                if (!apiUrl) {
+                    showError('Please enter a valid API URL');
+                    return;
+                }
+                testConnection(apiUrl);
+            });
+            
+            async function testConnection(apiUrl) {
+                resultsDiv.innerHTML = '<p>Testing connection to ' + apiUrl + '...</p>';
+                
+                try {
+                    const startTime = Date.now();
+                    const response = await fetch(`${apiUrl}/api/user/data?userId=test`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const endTime = Date.now();
+                    const responseTime = endTime - startTime;
+                    
+                    if (response.ok) {
+                        showSuccess(`Connection successful! Response time: ${responseTime}ms`);
+                    } else {
+                        // Even a 404 or 500 response means the server is reachable
+                        showSuccess(`Connection successful (Status: ${response.status} ${response.statusText}). Response time: ${responseTime}ms`);
+                    }
+                    
+                    try {
+                        const data = await response.json();
+                        resultsDiv.innerHTML += `<p>Response data:</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    } catch (e) {
+                        resultsDiv.innerHTML += `<p>Response is not JSON. Status: ${response.status} ${response.statusText}</p>`;
+                    }
+                } catch (error) {
+                    showError(`Connection failed: ${error.message}`);
+                    
+                    if (error.message.includes('Failed to fetch')) {
+                        resultsDiv.innerHTML += `
+                            <p>This could be due to:</p>
+                            <ul>
+                                <li>The server is not running</li>
+                                <li>CORS is not properly configured</li>
+                                <li>Network connectivity issues</li>
+                                <li>The URL is incorrect</li>
+                            </ul>
+                        `;
+                    }
+                }
+            }
+            
+            function showSuccess(message) {
+                resultsDiv.innerHTML = `<p class="success">✅ ${message}</p>`;
+            }
+            
+            function showError(message) {
+                resultsDiv.innerHTML = `<p class="error">❌ ${message}</p>`;
+            }
+        });
+    </script>
+</body>
+</html>

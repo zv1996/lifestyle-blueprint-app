@@ -1,0 +1,686 @@
+/**
+ * Meal Plan Styles for Lifestyle Blueprint
+ * 
+ * This stylesheet contains styles for the meal plan overlay and related components.
+ * Updated to match the global dark theme aesthetic.
+ */
+
+/* Overlay backdrop */
+.overlay-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(10, 14, 20, 0.8);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+}
+
+.overlay-backdrop.show {
+  opacity: 1;
+}
+
+/* Meal plan overlay */
+.meal-plan-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  background-color: var(--background-card);
+  border-radius: 16px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 
+              0 0 25px var(--shadow-color),
+              0 0 5px var(--shadow-color-accent);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transition: all 0.3s ease;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.meal-plan-overlay::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  -webkit-mask-composite: source-out;
+  pointer-events: none;
+}
+
+.meal-plan-overlay.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* Meal plan header */
+.meal-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  color: var(--text-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.meal-plan-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, 
+      rgba(255, 255, 255, 0) 0%, 
+      rgba(255, 255, 255, 0.1) 50%, 
+      rgba(255, 255, 255, 0) 100%);
+  transform: translateX(-100%);
+  animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.meal-plan-header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 24px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+  z-index: 1;
+}
+
+.close-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Meal plan content */
+.meal-plan-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: var(--background-card);
+  background-image: 
+    linear-gradient(var(--blueprint-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--blueprint-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Day sections */
+.meal-plan-day {
+  margin-bottom: 30px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), 0 0 10px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.meal-plan-day:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3), 0 0 15px var(--shadow-color);
+}
+
+.day-header {
+  margin: 0;
+  padding: 15px 20px;
+  background-color: var(--background-light);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--secondary-color);
+  background: linear-gradient(to right, rgba(110, 72, 228, 0.2), transparent);
+}
+
+.day-meals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 20px;
+  background-color: var(--background-card);
+}
+
+/* Meal cards */
+.meal-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  background-color: var(--background-light);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.meal-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 15px var(--shadow-color);
+  border-color: var(--primary-color);
+}
+
+.meal-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  -webkit-mask-composite: source-out;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.meal-card:hover::before {
+  opacity: 1;
+}
+
+.meal-card h4 {
+  margin: 0;
+  padding: 15px;
+  background-color: var(--background-card);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meal-description {
+  padding: 0 15px;
+  margin: 15px 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.meal-details {
+  padding: 0 15px 15px;
+}
+
+/* Meal sections (ingredients, recipe) */
+.meal-section {
+  margin-bottom: 15px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-card);
+}
+
+.meal-section-header {
+  margin: 0;
+  padding: 12px 15px;
+  background-color: var(--background-dark);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background-color 0.3s ease;
+}
+
+.meal-section-header:hover {
+  background-color: rgba(0, 229, 255, 0.1);
+}
+
+.meal-section-header::after {
+  content: '+';
+  font-size: 1.2rem;
+  font-weight: 300;
+  color: var(--primary-color);
+}
+
+.meal-section.expanded .meal-section-header::after {
+  content: '-';
+}
+
+.meal-section-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.meal-section.expanded .meal-section-content {
+  max-height: 500px;
+  padding: 15px;
+}
+
+/* Ingredients list */
+.ingredients-list {
+  margin: 0;
+  padding: 0 0 0 20px;
+  list-style-type: disc;
+}
+
+.ingredients-list li {
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Recipe instructions */
+.recipe-instructions {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+/* Macro nutrients */
+.meal-macros {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--border-color);
+}
+
+.macro-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.macro-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+
+.macro-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Snacks and favorite meals sections */
+.meal-plan-section {
+  margin-top: 30px;
+  padding: 20px;
+  border-radius: 16px;
+  background-color: var(--background-light);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2), 0 0 10px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.meal-plan-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 16px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.meal-plan-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+.snacks-container,
+.favorite-meals-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.snack-card,
+.favorite-meal-card {
+  background-color: var(--background-card);
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.snack-card:hover,
+.favorite-meal-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 15px var(--shadow-color);
+  border-color: var(--primary-color);
+}
+
+.snack-card h4,
+.favorite-meal-card h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.snack-macros,
+.favorite-meal-macros {
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Action buttons */
+.meal-plan-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--background-light);
+}
+
+.approve-button,
+.request-changes-button,
+.submit-changes-button,
+.cancel-changes-button,
+.add-change-request-button {
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.approve-button {
+  background: linear-gradient(to right, var(--success-color), #45a049);
+  color: var(--text-primary);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.approve-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(76, 175, 80, 0.4);
+}
+
+.request-changes-button,
+.cancel-changes-button {
+  background-color: var(--background-dark);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.request-changes-button:hover,
+.cancel-changes-button:hover {
+  background-color: var(--background-light);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.submit-changes-button {
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  color: var(--text-primary);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.submit-changes-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 15px var(--shadow-color);
+}
+
+.add-change-request-button {
+  background-color: var(--background-dark);
+  color: var(--primary-color);
+  border: 1px solid var(--border-color);
+  display: block;
+  margin: 15px auto;
+}
+
+.add-change-request-button:hover {
+  transform: translateY(-3px);
+  background-color: var(--background-light);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Change request form */
+.change-request-form {
+  padding: 20px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--background-light);
+}
+
+.change-request-form h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  color: var(--text-primary);
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+.change-requests-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.change-request {
+  background-color: var(--background-card);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.change-day,
+.change-meal {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-dark);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.change-description {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-dark);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: 'Montserrat', sans-serif;
+  resize: vertical;
+}
+
+.change-day:focus,
+.change-meal:focus,
+.change-description:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px var(--shadow-color);
+}
+
+.remove-change-request-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: var(--error-color);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.remove-change-request-button:hover {
+  text-decoration: underline;
+}
+
+.change-request-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* Loading state */
+.meal-plan-overlay.loading {
+  filter: blur(4px);
+}
+
+.loading-spinner-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1002;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.loading-spinner-container.show {
+  display: flex;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(0, 0, 0, 0.3);
+  border-top: 4px solid var(--primary-color);
+  border-right: 4px solid var(--secondary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  box-shadow: 0 0 15px var(--shadow-color);
+}
+
+.loading-text {
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  font-weight: 500;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .meal-plan-overlay {
+    width: 95%;
+    max-height: 95vh;
+  }
+  
+  .day-meals {
+    grid-template-columns: 1fr;
+  }
+  
+  .snacks-container,
+  .favorite-meals-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .meal-plan-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .approve-button,
+  .request-changes-button,
+  .submit-changes-button,
+  .cancel-changes-button {
+    width: 100%;
+  }
+}
+
+/* Empty state */
+.meal-card.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  background-color: var(--background-dark);
+  color: var(--text-muted);
+}
+
+.meal-card.empty h4 {
+  background-color: transparent;
+  border-bottom: none;
+}
+
+.meal-card.empty p {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+}

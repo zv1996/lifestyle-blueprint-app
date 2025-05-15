@@ -1,0 +1,33 @@
+{
+  "name": "lifestyle_blueprint_app",
+  "version": "1.0.0",
+  "description": "Lifestyle Blueprint meal planning chatbot PWA",
+  "main": "index.js",
+  "scripts": {
+    "create-admin": "node scripts/create-admin-user.js",
+    "start": "node api/server.js",
+    "dev": "nodemon api/server.js",
+    "build": "NODE_ENV=production PORT=3002 npm start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "meal-planning",
+    "chatbot",
+    "pwa",
+    "supabase"
+  ],
+  "author": "Zack Vivas",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.3",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "openai": "^4.28.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  }
+}

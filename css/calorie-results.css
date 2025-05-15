@@ -1,0 +1,521 @@
+/**
+ * Calorie Results Overlay Styles for Lifestyle Blueprint
+ * 
+ * This file contains styles for the calorie calculation results overlay
+ * and the special chat message that displays the results.
+ */
+
+/* Overlay backdrop */
+.overlay-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.overlay-backdrop.show {
+  opacity: 1;
+}
+
+/* Results overlay container */
+.results-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  width: 90%;
+  max-width: 600px;
+  background-color: var(--background-dark);
+  border-radius: 16px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 
+              0 0 25px var(--shadow-color),
+              0 0 5px var(--shadow-color-accent);
+  border: 1px solid var(--border-color);
+  padding: 30px;
+  z-index: 1001;
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.results-overlay.show {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+/* Overlay header */
+.results-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.results-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+}
+
+.results-header p {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+/* Results sections */
+.results-section {
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.results-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.results-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+/* Calorie summary */
+.calorie-summary {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.calorie-summary .weekly-calories {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 10px 0;
+}
+
+.calorie-summary .daily-calories {
+  font-size: 18px;
+  color: var(--text-primary);
+}
+
+/* User stats */
+.user-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #6B7280;
+}
+
+.stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Split grid */
+.split-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.split-card {
+  background-color: var(--background-card);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+}
+
+.split-card.weekday {
+  border-left: 4px solid var(--gradient-start);
+}
+
+.split-card.weekend {
+  border-left: 4px solid var(--gradient-end);
+}
+
+.split-card h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 0;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.split-card .calories {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gradient-start);
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.split-card.weekend .calories {
+  color: var(--gradient-end);
+}
+
+/* Macro distribution */
+.macro-distribution {
+  margin-top: 15px;
+}
+
+.macro-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.macro-label {
+  display: flex;
+  align-items: center;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.macro-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.macro-color.protein {
+  background-color: var(--gradient-start);
+}
+
+.macro-color.carbs {
+  background-color: var(--accent-color);
+}
+
+.macro-color.fat {
+  background-color: var(--gradient-end);
+}
+
+.macro-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.macro-grams {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin-left: 5px;
+}
+
+/* Macro chart */
+.macro-chart {
+  height: 10px;
+  background-color: var(--background-light);
+  border-radius: 5px;
+  overflow: hidden;
+  display: flex;
+  margin-top: 15px;
+}
+
+.macro-chart-segment {
+  height: 100%;
+}
+
+.macro-chart-segment.protein {
+  background-color: var(--gradient-start);
+}
+
+.macro-chart-segment.carbs {
+  background-color: var(--accent-color);
+}
+
+.macro-chart-segment.fat {
+  background-color: var(--gradient-end);
+}
+
+/* Create plan button */
+.create-plan-button {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  color: var(--text-primary);
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 20px;
+}
+
+.create-plan-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), 0 0 15px var(--shadow-color);
+}
+
+.create-plan-button:active {
+  transform: translateY(0);
+}
+
+/* Special chat message for calorie results */
+.message.calorie-results {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  color: var(--text-primary);
+}
+
+.message.calorie-results .message-content {
+  padding: 15px;
+}
+
+.message.calorie-results p {
+  color: var(--text-primary);
+  margin: 5px 0;
+}
+
+.message.calorie-results .result-highlight {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.message.calorie-results .macro-mini-chart {
+  display: flex;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.message.calorie-results .macro-mini-segment {
+  height: 100%;
+}
+
+.message.calorie-results .macro-mini-segment.protein {
+  background-color: var(--gradient-start);
+}
+
+.message.calorie-results .macro-mini-segment.carbs {
+  background-color: var(--accent-color);
+}
+
+.message.calorie-results .macro-mini-segment.fat {
+  background-color: var(--gradient-end);
+}
+
+/* Goal info */
+.goal-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 15px;
+  color: var(--text-primary);
+}
+
+.goal-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-right: 8px;
+}
+
+.goal-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Macro split info */
+.macro-split-info {
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.macro-split-info p {
+  margin: 5px 0;
+}
+
+.macro-split-info strong {
+  color: var(--text-primary);
+}
+
+.macro-reason {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .macro-reason {
+    font-size: 13px;
+    line-height: 1.3;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .results-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    border-radius: 0;
+    padding: 15px;
+    transform: translateY(100%);
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .results-overlay.show {
+    transform: translateY(0);
+  }
+  
+  .results-header {
+    margin-bottom: 15px;
+  }
+  
+  .results-header h2 {
+    font-size: 20px;
+  }
+  
+  .results-section {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+  }
+  
+  .results-section h3 {
+    font-size: 16px;
+    margin-bottom: 10px;
+  }
+  
+  .calorie-summary {
+    padding: 12px;
+  }
+  
+  .calorie-summary .weekly-calories {
+    font-size: 24px;
+    margin: 5px 0;
+  }
+  
+  .calorie-summary .daily-calories {
+    font-size: 16px;
+  }
+  
+  .goal-info {
+    margin-top: 10px;
+  }
+  
+  .split-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .split-card {
+    padding: 12px;
+  }
+  
+  .split-card h4 {
+    font-size: 14px;
+    margin-bottom: 5px;
+  }
+  
+  .split-card .calories {
+    font-size: 20px;
+    margin-bottom: 10px;
+  }
+  
+  .macro-row {
+    margin-bottom: 5px;
+  }
+  
+  .macro-color {
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+  }
+  
+  /* Compact macro rows for very small screens */
+  @media (max-height: 650px) and (max-width: 640px) {
+    .macro-distribution {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 5px;
+    }
+    
+    .macro-row {
+      width: 100%;
+      margin-bottom: 3px;
+    }
+    
+    .macro-chart {
+      height: 4px;
+    }
+    
+    .results-section:last-child {
+      margin-bottom: 10px;
+    }
+  }
+  
+  .macro-chart {
+    height: 6px;
+    margin-top: 10px;
+  }
+  
+  .macro-split-info p {
+    font-size: 14px;
+  }
+  
+  .create-plan-button {
+    margin-top: auto;
+    padding: 12px;
+  }
+}
+
+@media (max-height: 700px) and (max-width: 640px) {
+  .results-header h2 {
+    font-size: 18px;
+  }
+  
+  .calorie-summary .weekly-calories {
+    font-size: 20px;
+  }
+  
+  .calorie-summary .daily-calories {
+    font-size: 14px;
+  }
+  
+  .split-card .calories {
+    font-size: 18px;
+  }
+  
+  .macro-label, .macro-value {
+    font-size: 13px;
+  }
+  
+  .macro-grams {
+    font-size: 12px;
+  }
+}
