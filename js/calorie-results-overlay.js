@@ -90,47 +90,45 @@ class CalorieResultsOverlay {
         <h2>Your Personalized Calorie Plan</h2>
       </div>
       
-      <div class="results-section">
-        <h3>Weekly Calorie Target</h3>
-        <div class="calorie-summary">
-          <div class="weekly-calories">${calculations.weeklyCalories.toLocaleString()} calories/week</div>
-          <div class="daily-calories">${calculations.dailyAverage.toLocaleString()} calories/day average</div>
-        </div>
-        
-        <div class="goal-info">
-          <span class="goal-label">Your Goal:</span>
-          <span class="goal-value">${userData.fitnessGoal}</span>
-        </div>
-      </div>
-      
-      <div class="results-section">
-        <h3>5:2 Split (Weekday/Weekend)</h3>
-        <div class="split-grid">
-          <div class="split-card weekday">
-            <h4>Weekdays (Mon-Fri)</h4>
-            <div class="calories">${split.weekday.calories.toLocaleString()} calories/day</div>
-            <div class="macro-distribution">
-              ${this.createMacroRows(split.weekday.macroPercentages, split.weekday.macroGrams)}
+      <div class="results-content-wrapper">
+        <div class="results-section left-column">
+          <div class="weekly-target-section">
+            <h3>Weekly Calorie Target</h3>
+            <div class="calorie-summary">
+              <div class="weekly-calories">${calculations.weeklyCalories.toLocaleString()} calories/week</div>
+              <div class="daily-calories">${calculations.dailyAverage.toLocaleString()} calories/day average</div>
             </div>
-            ${this.createMacroChart(split.weekday.macroPercentages)}
           </div>
           
-          <div class="split-card weekend">
-            <h4>Weekends (Sat-Sun)</h4>
-            <div class="calories">${split.weekend.calories.toLocaleString()} calories/day</div>
-            <div class="macro-distribution">
-              ${this.createMacroRows(split.weekend.macroPercentages, split.weekend.macroGrams)}
+          <div class="macro-section">
+            <div class="macro-split-info">
+              <h3>Recommended Macronutrient Split</h3>
+              <p>We recommend a <strong>${macroSplit.type}</strong> split for you.</p>
             </div>
-            ${this.createMacroChart(split.weekend.macroPercentages)}
           </div>
         </div>
-      </div>
-      
-      <div class="results-section">
-        <h3>Recommended Macronutrient Split</h3>
-        <div class="macro-split-info">
-          <p>We recommend a <strong>${macroSplit.type}</strong> split for you.</p>
-          <p class="macro-reason">${macroSplit.reason}</p>
+        
+        <div class="results-section right-column">
+          <h3>5:2 Split (Weekday/Weekend)</h3>
+          <div class="split-grid">
+            <div class="split-card weekday">
+              <h4>Weekdays (Mon-Fri)</h4>
+              <div class="calories">${split.weekday.calories.toLocaleString()} calories/day</div>
+              <div class="macro-distribution">
+                ${this.createMacroRows(split.weekday.macroPercentages, split.weekday.macroGrams)}
+              </div>
+              ${this.createMacroChart(split.weekday.macroPercentages)}
+            </div>
+            
+            <div class="split-card weekend">
+              <h4>Weekends (Sat-Sun)</h4>
+              <div class="calories">${split.weekend.calories.toLocaleString()} calories/day</div>
+              <div class="macro-distribution">
+                ${this.createMacroRows(split.weekend.macroPercentages, split.weekend.macroGrams)}
+              </div>
+              ${this.createMacroChart(split.weekend.macroPercentages)}
+            </div>
+          </div>
         </div>
       </div>
       

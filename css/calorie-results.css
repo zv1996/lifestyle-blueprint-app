@@ -29,14 +29,16 @@
   left: 50%;
   transform: translate(-50%, -60%);
   width: 90%;
-  max-width: 600px;
+  max-width: 950px; /* Increased from 600px for more horizontal space */
+  max-height: 90vh; /* Ensure it doesn't exceed viewport height */
+  overflow-y: auto; /* Allow scrolling if needed */
   background-color: var(--background-dark);
   border-radius: 16px;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 
               0 0 25px var(--shadow-color),
               0 0 5px var(--shadow-color-accent);
   border: 1px solid var(--border-color);
-  padding: 30px;
+  padding: 25px 50px; /* Increased horizontal padding */
   z-index: 1001;
   opacity: 0;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -71,13 +73,12 @@
 
 /* Results sections */
 .results-section {
-  margin-bottom: 25px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: none; /* Removed borders */
 }
 
 .results-section:last-child {
-  border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
 }
@@ -87,7 +88,7 @@
   font-weight: 600;
   color: var(--text-primary);
   margin-top: 0;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
@@ -139,7 +140,8 @@
 .split-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  gap: 15px;
+  margin: 15px 0;
 }
 
 .split-card {
@@ -258,6 +260,7 @@
 .create-plan-button {
   display: block;
   width: 100%;
+  max-width: 100%;
   padding: 15px;
   background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
   color: var(--text-primary);
@@ -267,7 +270,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin-top: 20px;
+  margin: 25px auto 0;
 }
 
 .create-plan-button:hover {
@@ -346,6 +349,9 @@
 
 /* Macro split info */
 .macro-split-info {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  border-radius: 12px;
+  padding: 41px;
   text-align: center;
   color: var(--text-primary);
 }
@@ -370,7 +376,60 @@
   }
 }
 
-/* Responsive adjustments */
+/* New layout structure */
+.results-content-wrapper {
+  display: flex;
+  justify-content: space-between;
+  gap: 25px;
+  margin-bottom: 0px;
+}
+
+.left-column, .right-column {
+  flex: 1;
+  min-width: 0;
+}
+
+.weekly-target-section {
+  margin-bottom: 20px;
+}
+
+.macro-section {
+  margin-top: 20px;
+}
+
+.macro-split-info {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.macro-split-info h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Ensure create plan button is always visible */
+.create-plan-button {
+  margin: 25px auto 0;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+  .results-content-wrapper {
+    flex-direction: column;
+  }
+  
+  .left-column, .right-column {
+    width: 100%;
+  }
+}
+
+/* Responsive adjustments for mobile */
 @media (max-width: 640px) {
   .results-overlay {
     position: fixed;
