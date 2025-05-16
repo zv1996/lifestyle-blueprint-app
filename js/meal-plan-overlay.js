@@ -30,12 +30,13 @@ class MealPlanOverlay {
     this.createOverlay();
     
     // Add to the DOM
-    document.body.appendChild(this.backdrop);
     document.body.appendChild(this.overlay);
+    
+    // Prevent scrolling of the background content
+    document.body.style.overflow = 'hidden';
     
     // Trigger animations
     requestAnimationFrame(() => {
-      this.backdrop.classList.add('show');
       this.overlay.classList.add('show');
     });
   }
@@ -45,10 +46,6 @@ class MealPlanOverlay {
    */
   hide() {
     // Remove show classes to trigger animations
-    if (this.backdrop) {
-      this.backdrop.classList.remove('show');
-    }
-    
     if (this.overlay) {
       this.overlay.classList.remove('show');
     }
@@ -56,12 +53,11 @@ class MealPlanOverlay {
     // Hide loading spinner if visible
     this.hideLoadingState();
     
+    // Restore scrolling of the background content
+    document.body.style.overflow = '';
+    
     // Remove from DOM after animation completes
     setTimeout(() => {
-      if (this.backdrop && this.backdrop.parentNode) {
-        this.backdrop.remove();
-      }
-      
       if (this.overlay && this.overlay.parentNode) {
         this.overlay.remove();
       }
@@ -76,13 +72,13 @@ class MealPlanOverlay {
    * Create the overlay elements
    */
   createOverlay() {
-    // Create backdrop
-    this.backdrop = document.createElement('div');
-    this.backdrop.className = 'overlay-backdrop';
-    
     // Create overlay container
     this.overlay = document.createElement('div');
     this.overlay.className = 'meal-plan-overlay';
+    
+    // Create inner container for content
+    const container = document.createElement('div');
+    container.className = 'meal-plan-container';
     
     // Create loading spinner container
     this.loadingSpinner = document.createElement('div');
@@ -92,8 +88,11 @@ class MealPlanOverlay {
       <div class="loading-text">Updating meal plan...</div>
     `;
     
-    // Populate the overlay with content
-    this.overlay.innerHTML = this.createOverlayContent();
+    // Populate the container with content
+    container.innerHTML = this.createOverlayContent();
+    
+    // Add container to overlay
+    this.overlay.appendChild(container);
     
     // Add event listeners
     this.addEventListeners();

@@ -8,6 +8,7 @@
 import config from './config.js';
 import { getCurrentUser } from './auth.js';
 import { MealPlanOverlay } from './meal-plan-overlay.js';
+import { MealPlanLoadingOverlay } from './meal-plan-loading-overlay.js';
 
 /**
  * Class to handle meal plan creation and management
@@ -31,29 +32,33 @@ class MealPlanCreator {
    * @returns {Promise<void>}
    */
   async createMealPlan(conversationId) {
-    let loadingId = null;
+    // Create and show the loading overlay
+    const loadingOverlay = new MealPlanLoadingOverlay();
+    loadingOverlay.show();
     
     try {
       if (this.isCreating) {
         console.warn('Meal plan creation already in progress');
+        loadingOverlay.hide();
         return;
       }
       
       this.isCreating = true;
       this.conversationId = conversationId;
       
-      // Add a message to the chat
-      this.addBotMessage('Please wait a moment while we create your personalized meal plan...');
-      
-      // Show a loading indicator
-      loadingId = this.addLoadingIndicator();
+      // Initialize progress tracking
+      this.setupProgressEventSource();
       
       // Get the current user
       const user = getCurrentUser();
       
       if (!user) {
+        loadingOverlay.showError('User not authenticated');
         throw new Error('User not authenticated');
       }
+      
+      // Update status
+      loadingOverlay.updateStatusMessage('Checking for existing meal plans...');
       
       // First, check if a meal plan was already created for this conversation
       try {
@@ -75,15 +80,15 @@ class MealPlanCreator {
             this.mealPlanId = existingMealPlan.meal_plan_id;
             this.mealPlanData = existingMealPlan;
             
-            // Remove the loading indicator before showing the overlay
-            this.removeLoadingIndicator(loadingId);
-            loadingId = null;
+            // Show success message and hide loading overlay
+            loadingOverlay.showSuccess('Your personalized meal plan is ready!');
             
-            // Show success message
-            this.addBotMessage('Your personalized meal plan is ready!');
+            // Wait for the success message to be shown before showing the meal plan
+            setTimeout(() => {
+              // Show the meal plan overlay
+              this.showMealPlanOverlay(existingMealPlan);
+            }, 1500);
             
-            // Show the meal plan overlay
-            this.showMealPlanOverlay(existingMealPlan);
             return;
           }
         }
@@ -92,56 +97,54 @@ class MealPlanCreator {
         console.warn('Error checking for existing meal plan:', checkError);
       }
       
-      // Call the API to create the meal plan with timeout and retry logic
-      let response;
-      let retries = 0;
-      const maxRetries = 3; // Increased to 3 retries
-      let lastError = null;
+      // Call the API to create the meal plan with day-by-day approach
       let mealPlanCreated = false;
+      let lastError = null;
+      let response = null;
       
-      // Update the user on retry status
-      const updateRetryStatus = (retry, max, reason = '') => {
-        const statusMessage = reason 
-          ? `Attempt ${retry} didn't meet requirements (${reason}). Retrying...` 
-          : `Generating meal plan (attempt ${retry + 1}/${max + 1})...`;
+      // Update status
+      loadingOverlay.updateStatusMessage('Initializing meal plan creation...', 10);
+      
+      // Set up event source for progress updates
+      this.setupProgressListener((progressData) => {
+        if (progressData.day) {
+          const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+          const dayName = dayNames[progressData.day - 1] || `Day ${progressData.day}`;
+          loadingOverlay.updateStatus(dayName, progressData.day);
+        } else if (progressData.message) {
+          loadingOverlay.updateStatusMessage(progressData.message, progressData.progress);
+        }
+      });
+      
+      try {
+        // Create an AbortController to handle timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout for the entire process
         
-        this.addBotMessage(statusMessage);
-      };
-      
-      // Initial status message
-      updateRetryStatus(0, maxRetries);
-      
-      while (retries <= maxRetries && !mealPlanCreated) {
-        try {
-          // Create an AbortController to handle timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout (increased from 60s)
-          
-          response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/create`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              userId: user.id,
-              conversationId: this.conversationId,
-              retryCount: retries // Pass retry count to server for logging
-            }),
-            signal: controller.signal
-          });
-          
-          // Clear the timeout
-          clearTimeout(timeoutId);
-          
-          // If the response is successful, mark as created and break out of the retry loop
-          if (response.ok) {
-            mealPlanCreated = true;
-            break;
-          }
-          
-          // If we get a server error, increment retries and try again
-          retries++;
-          
+        // Update status
+        loadingOverlay.updateStatusMessage('Starting meal plan generation...', 15);
+        
+        // Call the API to create the meal plan
+        response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            conversationId: this.conversationId,
+            useNewApproach: true // Flag to use the day-by-day approach
+          }),
+          signal: controller.signal
+        });
+        
+        // Clear the timeout
+        clearTimeout(timeoutId);
+        
+        // If the response is successful, mark as created
+        if (response.ok) {
+          mealPlanCreated = true;
+        } else {
           // Try to get error details
           let errorReason = '';
           try {
@@ -153,36 +156,32 @@ class MealPlanCreator {
             lastError = new Error(`Server error: ${errorReason}`);
           }
           
-          if (retries <= maxRetries) {
-            console.log(`Retrying meal plan creation (${retries}/${maxRetries})...`);
-            updateRetryStatus(retries, maxRetries, errorReason);
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
-          }
-        } catch (fetchError) {
-          // Handle timeout or network errors
-          if (fetchError.name === 'AbortError') {
-            console.error('Meal plan creation request timed out');
-            lastError = new Error('Request timed out. The meal plan generation is taking longer than expected.');
-          } else {
-            console.error('Network error during meal plan creation:', fetchError);
-            lastError = fetchError;
-          }
-          
-          retries++;
-          
-          if (retries <= maxRetries) {
-            console.log(`Retrying meal plan creation (${retries}/${maxRetries})...`);
-            updateRetryStatus(retries, maxRetries, fetchError.message);
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries)); // Exponential backoff
-          }
+          console.error('Error creating meal plan:', errorReason);
         }
+      } catch (fetchError) {
+        // Handle timeout or network errors
+        if (fetchError.name === 'AbortError') {
+          console.error('Meal plan creation request timed out');
+          lastError = new Error('Request timed out. The meal plan generation is taking longer than expected.');
+        } else {
+          console.error('Network error during meal plan creation:', fetchError);
+          lastError = fetchError;
+        }
+      } finally {
+        // Clean up event source
+        this.cleanupProgressListener();
       }
       
-      // After all retries, check if we need to fetch the meal plan from the database
-      // This handles the case where the API call timed out but the meal plan was actually created
+      // Even if we got an error, check if a meal plan was created in the database
+      // This handles the case where the API call had errors but the meal plan was actually created
       if (!mealPlanCreated && this.conversationId) {
         try {
-          console.log('Checking if meal plan was created despite timeout/errors...');
+          loadingOverlay.updateStatusMessage('Checking for created meal plan...', 90);
+          console.log('Checking if meal plan was created despite errors...');
+          
+          // Wait a moment to allow the server to finish processing
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
           const checkResponse = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/by-conversation/${this.conversationId}`, {
             method: 'GET',
             headers: {
@@ -203,15 +202,15 @@ class MealPlanCreator {
               this.mealPlanId = existingMealPlan.meal_plan_id;
               this.mealPlanData = existingMealPlan;
               
-              // Remove the loading indicator before showing the overlay
-              this.removeLoadingIndicator(loadingId);
-              loadingId = null;
+              // Show success message and hide loading overlay
+              loadingOverlay.showSuccess('Your personalized meal plan is ready!');
               
-              // Show success message
-              this.addBotMessage('Your personalized meal plan is ready!');
+              // Wait for the success message to be shown before showing the meal plan
+              setTimeout(() => {
+                // Show the meal plan overlay
+                this.showMealPlanOverlay(existingMealPlan);
+              }, 1500);
               
-              // Show the meal plan overlay
-              this.showMealPlanOverlay(existingMealPlan);
               return;
             }
           }
@@ -220,31 +219,27 @@ class MealPlanCreator {
         }
       }
       
-      // If we still don't have a valid response after retries and database check
+      // If we still don't have a valid response and meal plan
       if (!mealPlanCreated || !response || !response.ok) {
-        // Only throw error after all retries are exhausted
+        // Show error in the loading overlay
         if (lastError) {
+          loadingOverlay.showError(lastError.message);
           throw lastError;
         } else {
-          // Try to parse error data if possible
-          let errorMessage = 'Unknown error';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || response.statusText;
-          } catch (e) {
-            errorMessage = response ? response.statusText : 'Failed to connect to server';
-          }
-          
-          throw new Error(`Error creating meal plan: ${errorMessage}`);
+          const error = new Error('Failed to create meal plan. Please try again later.');
+          loadingOverlay.showError(error.message);
+          throw error;
         }
       }
       
       // Get the meal plan data
       let mealPlan;
       try {
+        loadingOverlay.updateStatusMessage('Processing meal plan data...', 95);
         mealPlan = await response.json();
       } catch (jsonError) {
         console.error('Error parsing meal plan JSON:', jsonError);
+        loadingOverlay.showError('Error parsing meal plan data from server');
         throw new Error('Error parsing meal plan data from server');
       }
       
@@ -254,27 +249,176 @@ class MealPlanCreator {
       
       console.log('Meal plan created:', mealPlan);
       
-      // Remove the loading indicator before showing the overlay
-      this.removeLoadingIndicator(loadingId);
-      loadingId = null;
+      // Show success message and hide loading overlay
+      loadingOverlay.showSuccess('Your personalized meal plan is ready!');
       
-      // Show success message
-      this.addBotMessage('Your personalized meal plan is ready!');
+      // Wait for the success message to be shown before showing the meal plan
+      setTimeout(() => {
+        // Show the meal plan overlay
+        this.showMealPlanOverlay(mealPlan);
+      }, 1500);
       
-      // Show the meal plan overlay
-      this.showMealPlanOverlay(mealPlan);
     } catch (error) {
       console.error('Error creating meal plan:', error);
-      this.addBotMessage(`Sorry, there was an error creating your meal plan: ${error.message}`);
       
-      // Remove the loading indicator if it exists
-      if (loadingId) {
-        this.removeLoadingIndicator(loadingId);
-        loadingId = null;
+      // Check if we have a partial meal plan in the database
+      if (this.conversationId) {
+        try {
+          loadingOverlay.updateStatusMessage('Checking for partial meal plan...', 90);
+          
+          // Wait a moment to allow the server to finish processing
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const checkResponse = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/by-conversation/${this.conversationId}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (checkResponse.ok) {
+            const existingMealPlan = await checkResponse.json();
+            
+            // If we found a meal plan, use it even if it's partial
+            if (existingMealPlan && existingMealPlan.meal_plan_id) {
+              console.log('Found partial meal plan despite errors:', existingMealPlan);
+              
+              // Store the meal plan data
+              this.mealPlanId = existingMealPlan.meal_plan_id;
+              this.mealPlanData = existingMealPlan;
+              
+              // Show partial success message and hide loading overlay
+              loadingOverlay.showSuccess('We encountered some issues, but your meal plan is ready!');
+              
+              // Wait for the success message to be shown before showing the meal plan
+              setTimeout(() => {
+                // Show the meal plan overlay
+                this.showMealPlanOverlay(existingMealPlan);
+              }, 1500);
+              
+              return;
+            }
+          }
+        } catch (checkError) {
+          console.warn('Error checking for partial meal plan:', checkError);
+        }
       }
+      
+      // If we couldn't find a partial meal plan, show the error
+      loadingOverlay.showError(error.message);
     } finally {
       this.isCreating = false;
     }
+  }
+  
+  /**
+   * Set up event source for progress updates
+   */
+  setupProgressEventSource() {
+    // Import the socket client
+    import('./socket-client.js').then(module => {
+      this.socketClient = module.socketClient;
+      console.log('Socket client imported for progress updates');
+    }).catch(error => {
+      console.error('Error importing socket client:', error);
+    });
+  }
+  
+  /**
+   * Set up a listener for progress updates
+   * @param {Function} callback - The callback to call with progress data
+   */
+  setupProgressListener(callback) {
+    // Store the callback
+    this.progressCallback = callback;
+    
+    // Set up event listener for Socket.IO progress events
+    if (this.socketClient) {
+      console.log('Setting up Socket.IO progress listener');
+      this.socketClient.on('meal-plan-progress', this.handleProgressEvent.bind(this));
+    } else {
+      // If Socket.IO is not available, fall back to simulated progress
+      console.log('Socket.IO not available, using simulated progress');
+      window.addEventListener('meal-plan-progress', this.handleProgressEvent.bind(this));
+      this.simulateProgressUpdates();
+    }
+  }
+  
+  /**
+   * Handle progress event
+   * @param {Object} data - The progress event data
+   */
+  handleProgressEvent(data) {
+    if (this.progressCallback) {
+      this.progressCallback(data);
+    }
+  }
+  
+  /**
+   * Clean up progress listener
+   */
+  cleanupProgressListener() {
+    // Remove Socket.IO event listener
+    if (this.socketClient) {
+      this.socketClient.off('meal-plan-progress', this.handleProgressEvent.bind(this));
+    } else {
+      // Remove window event listener if using simulated progress
+      window.removeEventListener('meal-plan-progress', this.handleProgressEvent.bind(this));
+    }
+    
+    // Clear any simulated progress timers
+    if (this.progressTimers) {
+      this.progressTimers.forEach(timer => clearTimeout(timer));
+      this.progressTimers = [];
+    }
+  }
+  
+  /**
+   * Simulate progress updates for testing/demo purposes
+   * Only used if Socket.IO is not available
+   */
+  simulateProgressUpdates() {
+    console.log('Simulating progress updates');
+    this.progressTimers = [];
+    
+    // Day 1
+    this.progressTimers.push(setTimeout(() => {
+      this.dispatchProgressEvent({ day: 1, message: 'Creating meals for Monday...' });
+    }, 2000));
+    
+    // Day 2
+    this.progressTimers.push(setTimeout(() => {
+      this.dispatchProgressEvent({ day: 2, message: 'Creating meals for Tuesday...' });
+    }, 6000));
+    
+    // Day 3
+    this.progressTimers.push(setTimeout(() => {
+      this.dispatchProgressEvent({ day: 3, message: 'Creating meals for Wednesday...' });
+    }, 10000));
+    
+    // Day 4
+    this.progressTimers.push(setTimeout(() => {
+      this.dispatchProgressEvent({ day: 4, message: 'Creating meals for Thursday...' });
+    }, 14000));
+    
+    // Day 5
+    this.progressTimers.push(setTimeout(() => {
+      this.dispatchProgressEvent({ day: 5, message: 'Creating meals for Friday...' });
+    }, 18000));
+    
+    // Finalizing
+    this.progressTimers.push(setTimeout(() => {
+      this.dispatchProgressEvent({ message: 'Finalizing your meal plan...', progress: 90 });
+    }, 22000));
+  }
+  
+  /**
+   * Dispatch a progress event (for simulated progress only)
+   * @param {Object} detail - The progress event detail
+   */
+  dispatchProgressEvent(detail) {
+    const event = new CustomEvent('meal-plan-progress', { detail });
+    window.dispatchEvent(event);
   }
   
   /**

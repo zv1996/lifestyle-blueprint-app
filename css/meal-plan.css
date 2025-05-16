@@ -5,50 +5,53 @@
  * Updated to match the global dark theme aesthetic.
  */
 
-/* Overlay backdrop */
-.overlay-backdrop {
+/* Meal plan overlay */
+.meal-plan-overlay {
   position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh; /* Use viewport height */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+  opacity: 0;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Backdrop blur effect */
+.meal-plan-overlay::before {
+  content: '';
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background-color: rgba(10, 14, 20, 0.8);
-  z-index: 1000;
-  opacity: 0;
-  transition: opacity 0.3s ease;
   -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
+  z-index: -1;
 }
 
-.overlay-backdrop.show {
-  opacity: 1;
-}
-
-/* Meal plan overlay */
-.meal-plan-overlay {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%) scale(0.95);
+/* Gradient border effect */
+.meal-plan-container {
   width: 90%;
   max-width: 1200px;
   max-height: 90vh;
-  background-color: var(--background-card);
+  background-color: var(--background-dark);
   border-radius: 16px;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 
               0 0 25px var(--shadow-color),
               0 0 5px var(--shadow-color-accent);
-  z-index: 1001;
   display: flex;
   flex-direction: column;
-  opacity: 0;
-  transition: all 0.3s ease;
   overflow: hidden;
   border: 1px solid var(--border-color);
   position: relative;
 }
 
-.meal-plan-overlay::before {
+.meal-plan-container::before {
   content: '';
   position: absolute;
   top: 0;
@@ -68,7 +71,6 @@
 
 .meal-plan-overlay.show {
   opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
 }
 
 /* Meal plan header */
@@ -135,7 +137,7 @@
 .meal-plan-content {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 25px 50px;
   background-color: var(--background-card);
   background-image: 
     linear-gradient(var(--blueprint-grid) 1px, transparent 1px),
@@ -637,11 +639,6 @@
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-  .meal-plan-overlay {
-    width: 95%;
-    max-height: 95vh;
-  }
-  
   .day-meals {
     grid-template-columns: 1fr;
   }
@@ -661,6 +658,127 @@
   .submit-changes-button,
   .cancel-changes-button {
     width: 100%;
+  }
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 640px) {
+  .meal-plan-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    transform: translateY(100%);
+    display: flex;
+    flex-direction: column;
+    padding: 15px;
+  }
+  
+  .meal-plan-overlay.show {
+    transform: translateY(0);
+  }
+  
+  .meal-plan-overlay::before {
+    border-radius: 0;
+  }
+  
+  .meal-plan-header {
+    padding: 15px;
+  }
+  
+  .meal-plan-header h2 {
+    font-size: 20px;
+  }
+  
+  .meal-plan-content {
+    padding: 15px;
+  }
+  
+  .meal-plan-day {
+    margin-bottom: 20px;
+  }
+  
+  .day-header {
+    padding: 12px 15px;
+    font-size: 18px;
+  }
+  
+  .day-meals {
+    padding: 15px;
+    gap: 15px;
+  }
+  
+  .meal-card h4 {
+    padding: 12px;
+    font-size: 16px;
+  }
+  
+  .meal-description {
+    padding: 0 12px;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  
+  .meal-details {
+    padding: 0 12px 12px;
+  }
+  
+  .meal-section-header {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  
+  .meal-section.expanded .meal-section-content {
+    padding: 12px;
+  }
+  
+  .ingredients-list li {
+    font-size: 14px;
+  }
+  
+  .recipe-instructions {
+    font-size: 14px;
+  }
+  
+  .meal-plan-actions {
+    padding: 15px;
+  }
+  
+  .change-request-form {
+    padding: 15px;
+  }
+  
+  .change-request-form h3 {
+    font-size: 18px;
+  }
+  
+  /* Fix border radius for meal plan sections on mobile */
+  .meal-plan-section {
+    border-radius: 12px;
+  }
+  
+  .meal-plan-section::before {
+    border-radius: 12px;
+  }
+  
+  /* Ensure loading spinner is properly positioned on mobile */
+  .loading-spinner-container {
+    z-index: 1003; /* Higher than the overlay */
+  }
+  
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .loading-text {
+    font-size: 1rem;
   }
 }
 

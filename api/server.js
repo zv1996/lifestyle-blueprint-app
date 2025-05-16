@@ -16,6 +16,27 @@ const dbClient = require('./database/client');
 // Create Express app
 const app = express();
 const port = process.env.PORT || 3001;
+const server = require('http').createServer(app);
+
+// Set up Socket.IO for real-time progress updates
+const io = require('socket.io')(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// Make io available globally for other modules
+global.io = io;
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
 
 // Middleware
 app.use(cors({
@@ -338,13 +359,14 @@ app.get('/api/user/:userId/calorie-calculations', async (req, res) => {
 // API endpoint to create a meal plan
 app.post('/api/meal-plan/create', async (req, res) => {
   try {
-    const { userId, conversationId } = req.body;
+    const { userId, conversationId, useNewApproach, retryCount } = req.body;
     
     if (!userId || !conversationId) {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
     
-    console.log('Creating meal plan for user:', userId, 'conversation:', conversationId);
+    console.log('Creating meal plan for user:', userId, 'conversation:', conversationId, 
+      useNewApproach ? '(using day-by-day approach)' : '');
     
     // Get all user data needed for meal plan creation
     const userData = await dbClient.getAllUserData(userId, conversationId);
@@ -355,6 +377,8 @@ app.post('/api/meal-plan/create', async (req, res) => {
     
     // Create the meal plan using OpenAI
     const openaiClient = require('./openai/meal-plan');
+    
+    // Generate the meal plan - the generateMealPlan function now supports day-by-day generation
     const mealPlanData = await openaiClient.generateMealPlan(userData);
     
     // Store the meal plan in the database
@@ -367,6 +391,23 @@ app.post('/api/meal-plan/create', async (req, res) => {
     res.json(mealPlan);
   } catch (error) {
     console.error('Error creating meal plan:', error);
+    
+    // Check if a meal plan was created despite the error
+    // This can happen if the error occurred after meal plan creation
+    try {
+      const { userId, conversationId } = req.body;
+      if (conversationId) {
+        const existingMealPlans = await dbClient.getMealPlansByUserId(userId, conversationId);
+        
+        if (existingMealPlans && existingMealPlans.length > 0) {
+          console.log('Found meal plan that was created despite errors:', existingMealPlans[0].meal_plan_id);
+          return res.json(existingMealPlans[0]);
+        }
+      }
+    } catch (checkError) {
+      console.warn('Error checking for created meal plan:', checkError);
+    }
+    
     res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
@@ -499,7 +540,7 @@ app.get('/api/user/:userId/data', async (req, res) => {
 });
 
 // Start the server
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
 

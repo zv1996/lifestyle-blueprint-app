@@ -1,5 +1,6 @@
 import { isAuthenticated, getCurrentUser, signOut } from './auth.js';
 import { initChatbot } from './chatbot.js';
+import { socketClient } from './socket-client.js';
 import './calorie-calculator.js';
 import './calorie-results-overlay.js';
 import './calorie-calculation-collector.js';
