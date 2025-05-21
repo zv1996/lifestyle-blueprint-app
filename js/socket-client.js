@@ -5,6 +5,8 @@
  * and provides event handling for real-time updates.
  */
 
+import config from './config.js';  // Direct import for environment-aware configuration
+
 /**
  * Class to manage Socket.IO connection and events
  */
@@ -39,10 +41,10 @@ connect() {
       return;
     }
     
-    // Get the base URL from the config
-    const baseUrl = window.config ? window.config.getApiBaseUrl() : '';
+    // Get the base URL directly from the imported config
+    const baseUrl = config.getApiBaseUrl();
     
-    console.log('Creating new socket connection to:', baseUrl || 'default server');
+    console.log('Creating new socket connection to:', baseUrl);
     
     // Create the Socket.IO connection with connection timeout
     this.socket = io(baseUrl, {
