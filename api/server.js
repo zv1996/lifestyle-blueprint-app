@@ -43,12 +43,14 @@ app.use(cors({
   // Allow requests from any origin in development
   // In production, you should specify your PHP hosted domain
   origin: function(origin, callback) {
-    // Log the origin for debugging
-    console.log('Request origin:', origin);
+    // Only log origins for non-undefined origins to reduce console spam
+    if (origin) {
+      console.log('Request origin:', origin);
+    }
     
-    // In development, allow requests with no origin (like mobile apps or curl)
+    // In development, allow requests with no origin (like mobile apps, service workers, or curl)
     if (!origin) {
-      console.log('Allowing request with no origin');
+      // Don't log every undefined origin to reduce console spam
       return callback(null, true);
     }
     
@@ -70,13 +72,11 @@ app.use(cors({
       'https://lifestyle-blueprint-app.onrender.com'
     ];
     
-    console.log('Checking against allowed domains:', allowedDomains);
-    
     if (allowedDomains.length === 0 || allowedDomains.indexOf(origin) !== -1) {
       console.log('Origin is in allowed domains list');
       callback(null, true);
     } else {
-      console.log('Origin is NOT in allowed domains list');
+      console.log('Origin is NOT in allowed domains list:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -212,6 +212,25 @@ app.get('/api/user/:userId/meal-plans', async (req, res) => {
   }
 });
 
+// API endpoint to get meal plans for the meal history page
+app.get('/api/meal-plans/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing user ID' });
+    }
+    
+    // Get meal plans for the user
+    const mealPlans = await dbClient.getMealPlansByUserId(userId);
+    
+    res.json(mealPlans);
+  } catch (error) {
+    console.error('Error getting meal plans for history page:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // API endpoint to get a specific meal plan
 app.get('/api/meal-plan/:mealPlanId', async (req, res) => {
   try {
@@ -269,7 +288,7 @@ app.get('/api/meal-plan/:mealPlanId/groceries', async (req, res) => {
     }
     
     // Get groceries for the meal plan
-    const groceries = await dbClient.getGroceriesByMealPlanId(mealPlanId);
+    const groceries = await dbClient.getGroceryListByMealPlanId(mealPlanId);
     
     res.json(groceries);
   } catch (error) {
@@ -277,6 +296,12 @@ app.get('/api/meal-plan/:mealPlanId/groceries', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// Import shopping list routes
+const shoppingListRoutes = require('./routes/shopping-list');
+
+// Use shopping list routes
+app.use('/api/shopping-list', shoppingListRoutes);
 
 // API endpoint to store a conversation message
 app.post('/api/conversation/message', async (req, res) => {
@@ -465,6 +490,36 @@ app.put('/api/meal-plan/:mealPlanId/approve', async (req, res) => {
     res.json(mealPlan);
   } catch (error) {
     console.error('Error approving meal plan:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// API endpoint to toggle favorite status for a meal plan
+app.put('/api/meal-plan/:mealPlanId/favorite', async (req, res) => {
+  try {
+    const { mealPlanId } = req.params;
+    const { userId, isFavorite } = req.body;
+    
+    if (!mealPlanId || !userId) {
+      return res.status(400).json({ error: 'Missing required parameters' });
+    }
+    
+    // Get the existing meal plan
+    const existingMealPlan = await dbClient.getMealPlanById(mealPlanId);
+    
+    if (!existingMealPlan) {
+      return res.status(404).json({ error: 'Meal plan not found' });
+    }
+    
+    // Update the meal plan with the favorite status
+    const updatedMealPlan = await dbClient.storeMealPlan(userId, {
+      meal_plan_id: mealPlanId,
+      is_favorite: isFavorite
+    }, existingMealPlan.conversation_id);
+    
+    res.json(updatedMealPlan);
+  } catch (error) {
+    console.error('Error updating favorite status:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

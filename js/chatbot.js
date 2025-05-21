@@ -36,6 +36,7 @@ let basicInfoCollector = null;
 let metricsAndGoalsCollector = null;
 let dietPreferencesCollector = null;
 let calorieCalculationCollector = null;
+let shoppingListCollector = null;
 
 /**
  * Initialize the chatbot
@@ -161,6 +162,49 @@ function initChatbot() {
     console.log('Transitioning to MEAL_PLAN_CREATION stage (via event)');
     console.log('Calorie calculation results:', event.detail?.results);
   });
+  
+  // Add event listener for shopping list stage start
+  document.addEventListener('shoppingListStageStarted', (event) => {
+    // Transition to the shopping list stage
+    currentState.stage = STAGES.SHOPPING_LIST;
+    console.log('Transitioning to SHOPPING_LIST stage (via event)');
+    console.log('Meal plan for shopping list:', event.detail?.mealPlan);
+    
+    // Import the shopping list collector
+    import('./shopping-list-collector.js').then(module => {
+      const { initShoppingListCollector } = module;
+      
+      // Initialize the shopping list collector
+      shoppingListCollector = initShoppingListCollector({
+        chatMessages: document.getElementById('chatMessages'),
+        userInput: document.getElementById('userInput'),
+        sendButton: document.getElementById('sendButton'),
+        conversationId: currentState.conversationId,
+        mealPlanId: event.detail?.mealPlan?.meal_plan_id
+      });
+      
+      // Add event listener for starting the shopping list process
+      document.addEventListener('startShoppingList', (startEvent) => {
+        console.log('Starting shopping list process:', startEvent.detail);
+        if (shoppingListCollector && typeof shoppingListCollector.start === 'function') {
+          shoppingListCollector.start();
+        } else {
+          console.error('Shopping list collector not properly initialized');
+          addBotMessage('Sorry, there was an error starting the shopping list process. Please try again later.');
+        }
+      });
+    }).catch(error => {
+      console.error('Error importing shopping list collector:', error);
+    });
+  });
+  
+  // Add event listener for shopping list completion
+  document.addEventListener('shoppingListComplete', (event) => {
+    // Transition to the finalization stage
+    currentState.stage = STAGES.FINALIZATION;
+    console.log('Transitioning to FINALIZATION stage (via event)');
+    console.log('Shopping list:', event.detail?.shoppingList);
+  });
 }
 
 /**
@@ -266,6 +310,13 @@ async function handleSendMessage() {
       // The calorie calculation stage doesn't process user messages
       // It's handled automatically by the calorie-calculation-collector.js
       return;
+    } else if (currentState.stage === STAGES.SHOPPING_LIST) {
+      // Process with the shopping list collector
+      if (shoppingListCollector) {
+        await shoppingListCollector.processMessage(message);
+      } else {
+        addBotMessage('The shopping list stage is not ready yet. Please try again in a moment.');
+      }
     } else {
       // For other stages, we'll implement OpenAI Chat Completions later
       addBotMessage('This stage is not yet implemented. Coming soon!');

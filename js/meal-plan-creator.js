@@ -562,18 +562,51 @@ class MealPlanCreator {
       
       console.log('Meal plan approved:', approvedMealPlan);
       
-      // Add a message to the chat
-      this.addBotMessage('Your meal plan has been approved! You can view it anytime in the Meal Plans section.');
-      
-      // Hide the loading state and close the overlay
+      // Hide the loading state
       if (currentOverlay) {
         currentOverlay.hideLoadingState();
-        currentOverlay.hide();
-        this.overlay = null;
       }
+      
+      // Trigger the shopping list stage
+      this.triggerShoppingListStage(approvedMealPlan);
+      
     } catch (error) {
       console.error('Error approving meal plan:', error);
       this.addBotMessage(`Sorry, there was an error approving your meal plan: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Trigger the shopping list stage
+   * @param {Object} mealPlan - The approved meal plan
+   */
+  triggerShoppingListStage(mealPlan) {
+    try {
+      // Add a message to the chat
+      this.addBotMessage('Your meal plan has been approved! Now let\'s create a shopping list for your meals.');
+      
+      // Dispatch event to update the chatbot stage FIRST
+      // This will initialize the shopping list collector in chatbot.js
+      const event = new CustomEvent('shoppingListStageStarted', {
+        detail: { mealPlan }
+      });
+      document.dispatchEvent(event);
+      
+      // Give the event time to be processed and the collector to be initialized
+      setTimeout(() => {
+        // Now manually start the shopping list process
+        // This will be picked up by the global shoppingListCollector in chatbot.js
+        const startEvent = new CustomEvent('startShoppingList', {
+          detail: { 
+            conversationId: this.conversationId,
+            mealPlanId: mealPlan.meal_plan_id
+          }
+        });
+        document.dispatchEvent(startEvent);
+      }, 500);
+    } catch (error) {
+      console.error('Error triggering shopping list stage:', error);
+      this.addBotMessage('Sorry, there was an error starting the shopping list process. Please try again later.');
     }
   }
   

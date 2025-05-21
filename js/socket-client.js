@@ -9,34 +9,51 @@
  * Class to manage Socket.IO connection and events
  */
 class SocketClient {
-  /**
-   * Initialize the Socket.IO client
-   */
-  constructor() {
-    this.socket = null;
-    this.connected = false;
-    this.eventHandlers = {};
-    
-    // Automatically connect when the class is instantiated
-    this.connect();
-  }
+/**
+ * Initialize the Socket.IO client
+ */
+constructor() {
+  this.socket = null;
+  this.connected = false;
+  this.eventHandlers = {};
   
-  /**
-   * Connect to the Socket.IO server
-   */
-  connect() {
-    try {
-      // Get the base URL from the config
-      const baseUrl = window.config ? window.config.getApiBaseUrl() : '';
-      
-      // Create the Socket.IO connection
-      this.socket = io(baseUrl, {
-        reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 20000
-      });
+  // No longer automatically connect when instantiated
+  // Connection will be explicitly requested when needed
+}
+  
+/**
+ * Connect to the Socket.IO server
+ */
+connect() {
+  try {
+    // If already connected or connecting, don't create another connection
+    if (this.socket) {
+      console.log('Socket connection already exists, not creating a new one');
+      return;
+    }
+    
+    // Check if we're in a redirect loop (indicated by a 'no_redirect' parameter)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('no_redirect')) {
+      console.log('Skipping socket connection due to no_redirect parameter');
+      return;
+    }
+    
+    // Get the base URL from the config
+    const baseUrl = window.config ? window.config.getApiBaseUrl() : '';
+    
+    console.log('Creating new socket connection to:', baseUrl || 'default server');
+    
+    // Create the Socket.IO connection with connection timeout
+    this.socket = io(baseUrl, {
+      reconnection: true,
+      reconnectionAttempts: 3,  // Reduced from 5
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 10000,  // Reduced from 20000
+      // Add transport options to prefer WebSocket
+      transports: ['websocket', 'polling']
+    });
       
       // Set up event handlers
       this.socket.on('connect', () => {
@@ -71,10 +88,28 @@ class SocketClient {
    */
   disconnect() {
     if (this.socket) {
+      console.log('Disconnecting socket:', this.socket.id);
       this.socket.disconnect();
       this.socket = null;
       this.connected = false;
     }
+  }
+  
+  /**
+   * Clean up socket connection when page is unloaded
+   * This helps prevent socket connection buildup during page transitions
+   */
+  setupPageUnloadCleanup() {
+    // Only set up once
+    if (this._unloadHandlerSet) return;
+    
+    window.addEventListener('beforeunload', () => {
+      console.log('Page unloading, cleaning up socket connection');
+      this.disconnect();
+    });
+    
+    this._unloadHandlerSet = true;
+    console.log('Page unload cleanup handler set up');
   }
   
   /**

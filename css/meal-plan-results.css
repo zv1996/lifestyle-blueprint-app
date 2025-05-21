@@ -1,0 +1,534 @@
+/**
+ * Meal Plan Results Styles for Lifestyle Blueprint
+ * 
+ * This stylesheet contains styles specific to the meal plan results page,
+ * which displays both the meal plan and shopping list after completion.
+ */
+
+/* Hero Section */
+.results-hero {
+    text-align: center;
+    padding: 4rem 1rem 2rem;
+    background: radial-gradient(circle at center, rgba(0, 229, 255, 0.15) 0%, rgba(10, 14, 20, 0) 70%);
+    position: relative;
+}
+
+.results-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        rgba(0, 229, 255, 0) 0%, 
+        rgba(0, 229, 255, 0.5) 50%, 
+        rgba(0, 229, 255, 0) 100%);
+}
+
+.results-hero h1 {
+    font-size: 2.8rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+.results-hero p {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+/* Results Container */
+.results-container {
+    max-width: 1100px;
+    margin: 0 auto 3rem;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 3rem;
+}
+
+/* Section Styles */
+.meal-plan-section,
+.shopping-list-section {
+    background-color: var(--background-card);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4), 
+                0 0 25px var(--shadow-color),
+                0 0 5px var(--shadow-color-accent);
+    border: 1px solid var(--border-color);
+    position: relative;
+}
+
+/* Override the padding from meal-plan.css */
+.meal-plan-section {
+    padding: 0;
+}
+
+.meal-plan-section::before,
+.shopping-list-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+.section-header {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    padding: 1.2rem 1.5rem;
+    color: var(--text-primary);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-header::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0) 0%, 
+        rgba(255, 255, 255, 0.1) 50%, 
+        rgba(255, 255, 255, 0) 100%);
+    transform: translateX(-100%);
+    animation: shimmer 3s infinite;
+}
+
+.section-header h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.section-actions {
+    display: flex;
+    gap: 0.8rem;
+    z-index: 1;
+}
+
+/* Action Buttons */
+.action-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 50px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    background-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+.action-button:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.action-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.action-button.primary {
+    background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+    color: var(--text-primary);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.action-button.primary:hover {
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3), 0 0 10px var(--shadow-color);
+}
+
+.action-button.secondary {
+    background-color: var(--background-light);
+    border: 1px solid var(--border-color);
+}
+
+.action-button.secondary:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2), 0 0 5px var(--shadow-color);
+}
+
+/* Content Areas */
+.meal-plan-content,
+.shopping-list-content {
+    padding: 1.5rem;
+}
+
+/* Loading Container */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: var(--text-secondary);
+}
+
+/* Error Container */
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    color: var(--error-color);
+    text-align: center;
+}
+
+.error-message {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(0, 229, 255, 0.2);
+    border-radius: 50%;
+    border-top-color: var(--primary-color);
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Meal Plan Days */
+.meal-plan-days {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+.meal-plan-day {
+    background-color: var(--background-light);
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.day-header {
+    background-color: var(--background-dark);
+    padding: 0.8rem 1rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.day-meals {
+    padding: 1rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .day-meals {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Meal Cards */
+.meal-card {
+    background-color: var(--background-card);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+}
+
+.meal-card h4 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.meal-description {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.meal-section {
+    margin-bottom: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.meal-section-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.meal-section-header::after {
+    content: '▼';
+    font-size: 0.7rem;
+    margin-left: 0.5rem;
+    transition: transform 0.3s ease;
+}
+
+.meal-section.expanded .meal-section-header::after {
+    transform: rotate(180deg);
+}
+
+.meal-section-content {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.ingredients-list {
+    list-style: disc;
+    padding-left: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.recipe-instructions {
+    white-space: pre-line;
+}
+
+.meal-macros {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.macro-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.macro-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.macro-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Snacks and Favorite Meals */
+.meal-plan-section-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 2rem 0 1rem;
+    color: var(--text-primary);
+    padding-bottom: 0.5rem;
+}
+
+.snacks-container,
+.favorite-meals-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.snacks-container {
+    margin-bottom: 15px;
+}
+
+.snack-card,
+.favorite-meal-card {
+    background-color: var(--background-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    padding: 1rem;
+}
+
+.snack-card h4,
+.favorite-meal-card h4 {
+    font-size: 1rem;
+    margin-bottom: 0.8rem;
+    color: var(--text-primary);
+}
+
+.snack-macros,
+.favorite-meal-macros {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Shopping List */
+.category-section {
+    margin-bottom: 1.5rem;
+}
+
+.category-header {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.category-header::after {
+    content: '▼';
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+}
+
+.category-section.collapsed .category-header::after {
+    transform: rotate(-90deg);
+}
+
+.category-section.collapsed .category-items {
+    display: none;
+}
+
+.category-items {
+    list-style: none;
+}
+
+.shopping-item {
+    display: flex;
+    align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(42, 52, 70, 0.5);
+}
+
+.shopping-item:last-child {
+    border-bottom: none;
+}
+
+.item-details {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.item-name {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.item-quantity {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+/* Results Actions */
+.results-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 3rem auto;
+    padding: 0 1.5rem;
+}
+
+/* Print Styles */
+@media print {
+    header, footer, .results-hero, .results-actions {
+        display: none;
+    }
+    
+    body {
+        background: white;
+        color: black;
+    }
+    
+    .results-container {
+        display: block;
+        max-width: 100%;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .meal-plan-section, .shopping-list-section {
+        box-shadow: none;
+        border: 1px solid #ddd;
+        margin-bottom: 2rem;
+        page-break-inside: avoid;
+    }
+    
+    .shopping-list-section {
+        margin-top: 3rem;
+    }
+    
+    .section-header {
+        background: #f0f0f0;
+        color: #333;
+    }
+    
+    .section-actions {
+        display: none;
+    }
+    
+    .meal-card, .snack-card, .favorite-meal-card, .shopping-item {
+        border-color: #ddd;
+        background: white;
+        color: black;
+    }
+    
+    .meal-section-header, .category-header {
+        color: #333;
+    }
+    
+    .meal-description, .item-name, .item-quantity {
+        color: #333;
+    }
+    
+    .macro-label, .macro-value {
+        color: #333;
+    }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .results-hero h1 {
+        font-size: 2.2rem;
+    }
+    
+    .results-hero p {
+        font-size: 1rem;
+    }
+    
+    .results-actions {
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .action-button {
+        width: 100%;
+        justify-content: center;
+    }
+}

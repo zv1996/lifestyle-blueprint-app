@@ -1,5 +1,10 @@
 /* Login Page Styles */
 
+/* Override the active underline for login button in header */
+nav a.login-btn.active::after {
+    width: 0 !important; /* Remove the underline */
+}
+
 /* Message Container */
 .message-container {
     margin-bottom: 1.5rem;

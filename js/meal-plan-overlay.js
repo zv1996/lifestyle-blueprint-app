@@ -634,6 +634,9 @@ class MealPlanOverlay {
     if (this.onApprove) {
       this.onApprove(this.mealPlan);
     }
+    
+    // Hide the overlay
+    this.hide();
   }
   
   /**

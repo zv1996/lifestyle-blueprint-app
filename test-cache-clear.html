@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cache and Auth Reset Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .card {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 5px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .button.danger {
+            background-color: #f44336;
+        }
+        .button:hover {
+            opacity: 0.8;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #dff0d8;
+            color: #3c763d;
+        }
+        .error {
+            background-color: #f2dede;
+            color: #a94442;
+        }
+        .info {
+            background-color: #d9edf7;
+            color: #31708f;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cache and Auth Reset Tool</h1>
+    
+    <div class="card">
+        <h2>Current Status</h2>
+        <div id="serviceWorkerStatus">Checking service worker status...</div>
+        <div id="authStatus">Checking authentication status...</div>
+    </div>
+    
+    <div class="card">
+        <h2>Reset Options</h2>
+        <p>If you're experiencing issues with the application, try these reset options:</p>
+        
+        <button id="clearAuthBtn" class="button">Clear Auth State Only</button>
+        <button id="clearCacheBtn" class="button">Clear Cache Only</button>
+        <button id="clearBothBtn" class="button danger">Clear Both & Reload</button>
+        <button id="resetAllBtn" class="button danger">Complete Reset (Use if other options fail)</button>
+        
+        <div id="statusMessage" class="status hidden"></div>
+    </div>
+    
+    <div class="card">
+        <h2>Technical Information</h2>
+        <p>This tool helps resolve issues with:</p>
+        <ul>
+            <li>Authentication redirect loops</li>
+            <li>Stale cached content</li>
+            <li>Service worker problems</li>
+        </ul>
+        <p>After clearing, you should be able to use the application normally.</p>
+    </div>
+    
+    <script>
+        // Check service worker status
+        function checkServiceWorkerStatus() {
+            const statusElement = document.getElementById('serviceWorkerStatus');
+            
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistration()
+                    .then(registration => {
+                        if (registration) {
+                            statusElement.innerHTML = `
+                                <p class="success">✅ Service Worker is registered</p>
+                                <p>Scope: ${registration.scope}</p>
+                                <p>State: ${registration.active ? 'Active' : 'Inactive'}</p>
+                            `;
+                        } else {
+                            statusElement.innerHTML = `
+                                <p class="info">ℹ️ No Service Worker is registered</p>
+                            `;
+                        }
+                    })
+                    .catch(error => {
+                        statusElement.innerHTML = `
+                            <p class="error">❌ Error checking Service Worker: ${error.message}</p>
+                        `;
+                    });
+            } else {
+                statusElement.innerHTML = `
+                    <p class="error">❌ Service Workers are not supported in this browser</p>
+                `;
+            }
+        }
+        
+        // Check authentication status
+        function checkAuthStatus() {
+            const statusElement = document.getElementById('authStatus');
+            const token = localStorage.getItem('supabase.auth.token');
+            
+            if (token) {
+                try {
+                    const parsedToken = JSON.parse(token);
+                    if (parsedToken && parsedToken.user) {
+                        statusElement.innerHTML = `
+                            <p class="success">✅ User is authenticated</p>
+                            <p>Email: ${parsedToken.user.email || 'Unknown'}</p>
+                        `;
+                    } else {
+                        statusElement.innerHTML = `
+                            <p class="error">❌ Auth token exists but is invalid</p>
+                        `;
+                    }
+                } catch (error) {
+                    statusElement.innerHTML = `
+                        <p class="error">❌ Auth token exists but is corrupted: ${error.message}</p>
+                    `;
+                }
+            } else {
+                statusElement.innerHTML = `
+                    <p class="info">ℹ️ User is not authenticated</p>
+                `;
+            }
+        }
+        
+        // Clear authentication state
+        function clearAuthState() {
+            return new Promise((resolve) => {
+                try {
+                    localStorage.removeItem('supabase.auth.token');
+                    sessionStorage.removeItem('supabase.auth.token');
+                    localStorage.removeItem('auth_redirect_count');
+                    
+                    // Update status
+                    checkAuthStatus();
+                    
+                    resolve(true);
+                } catch (error) {
+                    console.error('Error clearing auth state:', error);
+                    resolve(false);
+                }
+            });
+        }
+        
+        // Clear service worker cache
+        function clearCache() {
+            return new Promise((resolve, reject) => {
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    // Create a message channel for receiving a response
+                    const messageChannel = new MessageChannel();
+                    
+                    // Set a timeout to resolve anyway if the service worker doesn't respond
+                    const timeoutId = setTimeout(() => {
+                        console.log('Service worker did not respond in time, continuing anyway');
+                        resolve(false);
+                    }, 3000);
+                    
+                    // Set up the message handler
+                    messageChannel.port1.onmessage = (event) => {
+                        clearTimeout(timeoutId);
+                        if (event.data && event.data.action === 'CACHES_CLEARED') {
+                            console.log('Cache cleared successfully at:', event.data.timestamp);
+                            resolve(true);
+                        } else {
+                            console.error('Unexpected message from service worker:', event.data);
+                            resolve(false); // Resolve instead of reject to continue the process
+                        }
+                    };
+                    
+                    // Send message to service worker to clear caches
+                    try {
+                        navigator.serviceWorker.controller.postMessage(
+                            { action: 'CLEAR_CACHES' },
+                            [messageChannel.port2]
+                        );
+                        console.log('Cache clear request sent to service worker');
+                    } catch (error) {
+                        clearTimeout(timeoutId);
+                        console.error('Error sending message to service worker:', error);
+                        resolve(false);
+                    }
+                } else {
+                    console.log('No active service worker found to clear cache');
+                    resolve(false);
+                }
+            });
+        }
+        
+        // Unregister service workers
+        function unregisterServiceWorkers() {
+            return new Promise(async (resolve) => {
+                if ('serviceWorker' in navigator) {
+                    try {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        
+                        if (registrations.length === 0) {
+                            console.log('No service workers to unregister');
+                            resolve(false);
+                            return;
+                        }
+                        
+                        let unregisteredCount = 0;
+                        for (let registration of registrations) {
+                            const result = await registration.unregister();
+                            if (result) unregisteredCount++;
+                        }
+                        
+                        console.log(`Unregistered ${unregisteredCount} service worker(s)`);
+                        resolve(true);
+                    } catch (error) {
+                        console.error('Error unregistering service workers:', error);
+                        resolve(false);
+                    }
+                } else {
+                    resolve(false);
+                }
+            });
+        }
+        
+        // Clear all browser caches using the Cache API
+        function clearAllCaches() {
+            return new Promise(async (resolve) => {
+                if ('caches' in window) {
+                    try {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(
+                            cacheNames.map(cacheName => caches.delete(cacheName))
+                        );
+                        console.log('All caches cleared using Cache API');
+                        resolve(true);
+                    } catch (error) {
+                        console.error('Error clearing caches:', error);
+                        resolve(false);
+                    }
+                } else {
+                    console.log('Cache API not available');
+                    resolve(false);
+                }
+            });
+        }
+        
+        // Show status message
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+            statusElement.classList.remove('hidden');
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusElement.classList.add('hidden');
+            }, 5000);
+        }
+        
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check initial status
+            checkServiceWorkerStatus();
+            checkAuthStatus();
+            
+            // Set up button event listeners
+            document.getElementById('clearAuthBtn').addEventListener('click', async function() {
+                try {
+                    await clearAuthState();
+                    showStatus('Authentication state cleared successfully!', 'success');
+                } catch (error) {
+                    showStatus(`Error clearing auth state: ${error.message}`, 'error');
+                }
+            });
+            
+            document.getElementById('clearCacheBtn').addEventListener('click', async function() {
+                try {
+                    const cleared = await clearCache();
+                    if (cleared) {
+                        showStatus('Cache cleared successfully!', 'success');
+                    } else {
+                        showStatus('No active service worker found to clear cache.', 'info');
+                    }
+                } catch (error) {
+                    showStatus(`Error clearing cache: ${error.message}`, 'error');
+                }
+            });
+            
+            document.getElementById('clearBothBtn').addEventListener('click', async function() {
+                try {
+                    showStatus('Clearing auth state and cache...', 'info');
+                    
+                    // First clear auth state
+                    await clearAuthState();
+                    
+                    // Then clear the cache
+                    await clearCache();
+                    
+                    // Also clear all caches using the Cache API as a backup
+                    await clearAllCaches();
+                    
+                    showStatus('Auth state and cache cleared! Reloading page...', 'success');
+                    
+                    // Reload the page with no_redirect parameter to prevent redirect loops
+                    setTimeout(() => {
+                        window.location.href = '/login.html?no_redirect=true';
+                    }, 1500);
+                } catch (error) {
+                    showStatus(`Error during reset: ${error.message}`, 'error');
+                }
+            });
+            
+            document.getElementById('resetAllBtn').addEventListener('click', async function() {
+                try {
+                    showStatus('Performing complete application reset...', 'info');
+                    
+                    // Clear all storage
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    
+                    // Clear all caches
+                    await clearCache();
+                    await clearAllCaches();
+                    
+                    // Unregister service workers
+                    await unregisterServiceWorkers();
+                    
+                    showStatus('Complete reset successful! Reloading page...', 'success');
+                    
+                    // Reload the page with no_redirect parameter to prevent redirect loops
+                    setTimeout(() => {
+                        window.location.href = '/login.html?no_redirect=true';
+                    }, 1500);
+                } catch (error) {
+                    showStatus(`Error during complete reset: ${error.message}`, 'error');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

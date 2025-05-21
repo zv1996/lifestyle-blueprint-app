@@ -1,14 +1,9 @@
 // Production Service Worker for Lifestyle Blueprint App
-const CACHE_VERSION = '4';
+const CACHE_VERSION = '7'; // Incrementing version to force cache refresh
 const CACHE_NAME = `lifestyle-blueprint-v${CACHE_VERSION}`;
 
-// Assets to cache for offline use
+// Only cache static assets for offline use (no HTML files)
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/login.html',
-  '/contact.html',
-  '/meal-history.html',
   '/manifest.json',
   '/css/styles.css',
   '/css/login.css',
@@ -40,9 +35,7 @@ const urlsToCache = [
 
 // Install event - cache core assets
 self.addEventListener('install', event => {
-  // Skip waiting to activate the new service worker immediately
-  self.skipWaiting();
-  
+  // Don't use skipWaiting() to prevent race conditions with auth
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -57,8 +50,8 @@ self.addEventListener('install', event => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', event => {
-  // Take control of all clients immediately
-  event.waitUntil(clients.claim());
+  // Don't use clients.claim() to prevent race conditions with auth
+  console.log('Service worker activated');
   
   // Clear old caches
   const cacheWhitelist = [CACHE_NAME];
@@ -76,112 +69,103 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch event - implement cache-first strategy with network fallback
-self.addEventListener('fetch', event => {
+// Fetch event - implement network-first for HTML, cache-first for static assets
+// self.addEventListener('fetch', event => {
   // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
+//  if (event.request.method !== 'GET') {
+//    return;
+//  }
 
-  // Skip cross-origin requests
-  const url = new URL(event.request.url);
-  if (url.origin !== location.origin) {
-    return;
-  }
+  // Handle requests with undefined origin
+//  let url;
+//  try {
+//    url = new URL(event.request.url);
+    
+    // Skip cross-origin requests silently
+//    if (url.origin !== location.origin) {
+//      return;
+//    }
+//  } catch (error) {
+//    // Skip invalid URLs silently
+//    return;
+//  }
 
-  // Skip API requests - let them go directly to network
-  if (url.pathname.startsWith('/api/')) {
-    // For API requests, use network-only strategy
-    event.respondWith(
-      fetch(event.request)
-        .catch(error => {
-          console.error('API fetch failed:', error);
-          return new Response(JSON.stringify({ 
-            error: 'You appear to be offline. Please check your connection.' 
-          }), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 503
-          });
-        })
-    );
-    return;
-  }
+  // For HTML pages, API requests, and auth-related requests, bypass service worker completely
+//  if (event.request.headers.get('accept')?.includes('text/html') || 
+//      url.pathname === '/' || 
+//      url.pathname.endsWith('.html') ||
+//      url.pathname.startsWith('/api/') || 
+//      url.pathname.includes('/auth/') || 
+//      url.pathname.includes('supabase')) {
+//    // Let the browser handle these requests directly
+//    return;
+//  }
 
-  // For HTML pages, use network-first strategy
-  if (event.request.headers.get('accept').includes('text/html')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          // Clone the response
-          const responseToCache = response.clone();
-          
-          // Cache the latest version
-          caches.open(CACHE_NAME)
-            .then(cache => {
-              cache.put(event.request, responseToCache);
-            });
-            
-          return response;
-        })
-        .catch(() => {
-          // If network fails, try to serve from cache
-          return caches.match(event.request)
-            .then(cachedResponse => {
-              if (cachedResponse) {
-                return cachedResponse;
-              }
-              // If not in cache, serve the offline page
-              console.log('Network failed, serving cached index.html as fallback');
-              return caches.match('/index.html');
-            });
-        })
-    );
-    return;
-  }
+  // For JavaScript files, use network-first strategy during initialization
+//  if (url.pathname.endsWith('.js')) {
+//    event.respondWith(
+//      fetch(event.request)
+//        .then(response => {
+//          if (!response || response.status !== 200 || response.type !== 'basic') {
+//            return response;
+//          }
 
-  // For all other assets, use cache-first strategy
-  event.respondWith(
-    caches.match(event.request)
-      .then(cachedResponse => {
-        if (cachedResponse) {
-          // Return cached response
-          return cachedResponse;
-        }
+//          const responseToCache = response.clone();
+//          caches.open(CACHE_NAME)
+//            .then(cache => {
+//              cache.put(event.request, responseToCache);
+//            });
 
-        // If not in cache, fetch from network
-        return fetch(event.request)
-          .then(response => {
-            // Check if we received a valid response
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+//          return response;
+//        })
+//        .catch(() => caches.match(event.request))
+//    );
+//    return;
+//  }
 
-            // Clone the response
-            const responseToCache = response.clone();
+  // For other static assets (CSS, images), use cache-first strategy
+//  if (url.pathname.match(/\.(css|png|jpg|jpeg|gif|svg|ico)$/)) {
+//    event.respondWith(
+//      caches.match(event.request)
+//        .then(cachedResponse => {
+//          if (cachedResponse) {
+//            return cachedResponse;
+//          }
 
-            // Cache the new resource
-            caches.open(CACHE_NAME)
-              .then(cache => {
-                cache.put(event.request, responseToCache);
-              });
+//          return fetch(event.request)
+//            .then(response => {
+//              if (!response || response.status !== 200 || response.type !== 'basic') {
+//                return response;
+//              }
 
-            return response;
-          })
-          .catch(error => {
-            console.error('Fetch failed:', error);
-            // For images, return a placeholder if available
-            if (event.request.url.match(/\.(jpg|jpeg|png|gif|svg)$/)) {
-              return caches.match('/images/lifestyle-blueprint-logo-icon.png');
-            }
-            // For CSS/JS, just log the error - the page will handle missing resources
-            return new Response('/* Resource unavailable while offline */', {
-              headers: { 'Content-Type': 'text/plain' },
-              status: 503
-            });
-          });
-      })
-  );
-});
+//              const responseToCache = response.clone();
+//              caches.open(CACHE_NAME)
+//                .then(cache => {
+//                  cache.put(event.request, responseToCache);
+//                });
+
+//              return response;
+//            })
+//            .catch(() => {
+//              if (event.request.url.match(/\.(jpg|jpeg|png|gif|svg)$/)) {
+//                return caches.match('/images/lifestyle-blueprint-logo-icon.png');
+//              }
+//              return new Response('/* Resource unavailable while offline */', {
+//                headers: { 'Content-Type': 'text/plain' },
+//                status: 503
+//              });
+//            });
+//        })
+//    );
+//    return;
+//  }
+
+  // For all other requests, use network-first strategy
+//  event.respondWith(
+//    fetch(event.request)
+//      .catch(() => caches.match(event.request))
+//  );
+// });
 
 // Add a message handler for cache management
 self.addEventListener('message', event => {
@@ -189,21 +173,49 @@ self.addEventListener('message', event => {
     // Handle cache clearing
     if (event.data.action === 'CLEAR_CACHES') {
       event.waitUntil(
-        caches.keys().then(cacheNames => {
-          return Promise.all(
-            cacheNames.map(cacheName => {
-              console.log('Manually clearing cache:', cacheName);
-              return caches.delete(cacheName);
-            })
-          ).then(() => {
-            // Notify the client that caches were cleared
-            if (event.source) {
-              event.source.postMessage({
-                action: 'CACHES_CLEARED',
+        Promise.all([
+          // Clear all caches
+          caches.keys().then(cacheNames => {
+            console.log('Clearing all caches:', cacheNames);
+            return Promise.all(
+              cacheNames.map(cacheName => {
+                console.log('Manually clearing cache:', cacheName);
+                return caches.delete(cacheName);
+              })
+            );
+          }),
+          // Notify all clients to clear auth storage
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({
+                action: 'CLEAR_AUTH_STORAGE',
                 timestamp: new Date().toISOString()
               });
-            }
-          });
+            });
+          })
+        ]).then(() => {
+          // Notify the client that caches were cleared
+          if (event.source) {
+            event.source.postMessage({
+              action: 'CACHES_CLEARED',
+              timestamp: new Date().toISOString()
+            });
+          }
+          
+          // Re-register the service worker
+          self.registration.update();
+          
+          // Wait a moment and then notify clients that service worker is ready
+          setTimeout(() => {
+            self.clients.matchAll().then(clients => {
+              clients.forEach(client => {
+                client.postMessage({
+                  action: 'SERVICE_WORKER_READY',
+                  timestamp: new Date().toISOString()
+                });
+              });
+            });
+          }, 1000);
         })
       );
     }

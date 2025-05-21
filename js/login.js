@@ -1,8 +1,129 @@
-import { signIn, signUp, createUserProfile } from './auth.js';
+import { signIn, signUp, createUserProfile, waitForAuth, isAuthInitialized } from './auth.js';
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if user is already logged in
-    checkAuthState();
+// Wait for service worker to be ready - using the same implementation as auth.js
+async function waitForServiceWorkerReady() {
+    // If service worker is not supported, resolve immediately
+    if (!('serviceWorker' in navigator)) {
+        console.log('Service Worker not supported in this browser');
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        // If service worker is already active, resolve immediately
+        if (navigator.serviceWorker.controller) {
+            console.log('Service Worker is already active');
+            resolve();
+            return;
+        }
+
+        // Set up a listener for the custom serviceWorkerReady event
+        const handleServiceWorkerReady = (event) => {
+            console.log('Received service worker ready event:', event.detail);
+            window.removeEventListener('serviceWorkerReady', handleServiceWorkerReady);
+            resolve();
+        };
+        window.addEventListener('serviceWorkerReady', handleServiceWorkerReady);
+
+        // Otherwise wait for the service worker to be ready
+        const onControllerChange = () => {
+            console.log('Service Worker controller changed, now ready');
+            navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+            resolve();
+        };
+
+        // Listen for the controllerchange event
+        navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+
+        // If no service worker activates within 5 seconds, proceed anyway
+        setTimeout(() => {
+            console.log('Service Worker ready timeout - proceeding anyway');
+            navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+            window.removeEventListener('serviceWorkerReady', handleServiceWorkerReady);
+            resolve();
+        }, 5000);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        console.log('DOM loaded, waiting for service worker and auth to be ready...');
+        
+        // Set up a loading indicator
+        const authCard = document.querySelector('.auth-card');
+        if (authCard) {
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.className = 'loading-indicator';
+            loadingIndicator.innerHTML = '<div class="spinner"></div><p>Initializing application...</p>';
+            loadingIndicator.style.position = 'absolute';
+            loadingIndicator.style.top = '0';
+            loadingIndicator.style.left = '0';
+            loadingIndicator.style.width = '100%';
+            loadingIndicator.style.height = '100%';
+            loadingIndicator.style.display = 'flex';
+            loadingIndicator.style.flexDirection = 'column';
+            loadingIndicator.style.alignItems = 'center';
+            loadingIndicator.style.justifyContent = 'center';
+            loadingIndicator.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+            loadingIndicator.style.zIndex = '1000';
+            
+            // Add spinner styles
+            const style = document.createElement('style');
+            style.textContent = `
+                .spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid rgba(255, 255, 255, 0.3);
+                    border-radius: 50%;
+                    border-top-color: #fff;
+                    animation: spin 1s ease-in-out infinite;
+                    margin-bottom: 10px;
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            authCard.style.position = 'relative';
+            authCard.appendChild(loadingIndicator);
+            
+            // Loading indicator will be removed in the try/catch block
+        }
+        
+        // Initialize with a timeout
+        try {
+            const initPromise = Promise.all([
+                waitForServiceWorkerReady(),
+                waitForAuth()
+            ]);
+
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Initialization timed out')), 15000);
+            });
+
+            // Race between initialization and timeout
+            await Promise.race([initPromise, timeoutPromise]);
+            
+            console.log('Service worker and auth are ready, checking auth state...');
+            checkAuthStateWithSafeguard();
+        } finally {
+            // Always remove loading indicator
+            const loadingIndicator = document.querySelector('.loading-indicator');
+            if (loadingIndicator && loadingIndicator.parentNode) {
+                loadingIndicator.parentNode.removeChild(loadingIndicator);
+            }
+        }
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        // Show error message to user
+        showMessage('error', 'There was a problem initializing the application. Please try refreshing the page.');
+        
+        // Remove loading indicator if it exists
+        const loadingIndicator = document.querySelector('.loading-indicator');
+        if (loadingIndicator && loadingIndicator.parentNode) {
+            loadingIndicator.parentNode.removeChild(loadingIndicator);
+        }
+    }
     
     // Tab switching functionality
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -63,12 +184,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 showMessage('success', 'Login successful! Redirecting to dashboard...');
                 
+                // Reset redirect counter on successful login
+                localStorage.removeItem('auth_redirect_count');
+                
+                // Set up a listener for the caches cleared event
+                const cachesClearedPromise = new Promise((resolve) => {
+                    const handleCachesCleared = (event) => {
+                        console.log('Received caches cleared event during login redirect:', event.detail);
+                        window.removeEventListener('cachesCleared', handleCachesCleared);
+                        resolve();
+                    };
+                    window.addEventListener('cachesCleared', handleCachesCleared);
+                    
+                    // Set a timeout in case the event never fires
+                    setTimeout(() => {
+                        window.removeEventListener('cachesCleared', handleCachesCleared);
+                        console.warn('Timed out waiting for caches cleared event during login redirect');
+                        resolve();
+                    }, 1000);
+                });
+                
                 // Redirect to home page after a short delay
                 console.log('Login successful, redirecting to index.html in 1 second...');
-                setTimeout(() => {
+                setTimeout(async () => {
                     console.log('Redirecting now...');
+                    
+                    // Clear any stale caches before redirecting
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({
+                            action: 'CLEAR_CACHES'
+                        });
+                        
+                        // Wait for the cache to be cleared or timeout
+                        await cachesClearedPromise;
+                    }
+                    
                     // Use absolute path to ensure proper redirection
-                    window.location.href = window.location.origin + '/index.html';
+                    window.location.href = window.location.origin + '/index.html?no_redirect=true';
                 }, 1000);
             } catch (error) {
                 console.error('Login error:', error);
@@ -197,13 +349,96 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Check if user is already authenticated
-function checkAuthState() {
-    // This will be implemented with the auth service
-    // For now, we'll just check if there's a token in localStorage
-    const token = localStorage.getItem('supabase.auth.token');
-    if (token) {
-        window.location.href = 'index.html';
+// Check if user is already authenticated with improved safeguards against redirect loops
+function checkAuthStateWithSafeguard() {
+    // Make sure auth is initialized before checking state
+    if (!isAuthInitialized()) {
+        console.error('Auth not initialized yet, cannot check state');
+        return;
+    }
+    
+    // Get the URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Check if we're in a redirect loop (indicated by a 'no_redirect' parameter)
+    if (urlParams.has('no_redirect')) {
+        console.log('Skipping redirect check due to no_redirect parameter');
+        // Clear any potentially problematic auth tokens if we're in a loop
+        localStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('auth_redirect_count');
+        return;
+    }
+    
+    // Check for token with a more robust approach
+    try {
+        const token = localStorage.getItem('supabase.auth.token');
+        if (token) {
+            // Try to parse the token to verify it's valid JSON
+            const parsedToken = JSON.parse(token);
+            
+            // Validate token more thoroughly
+            if (parsedToken && 
+                parsedToken.user && 
+                parsedToken.user.id && 
+                parsedToken.access_token && 
+                parsedToken.expires_at &&
+                !window.location.href.includes('no_redirect')) {
+                
+                // Check if token is expired
+                const expiresAt = new Date(parsedToken.expires_at * 1000);
+                const now = new Date();
+                
+                if (expiresAt <= now) {
+                    console.log('Token is expired, clearing token');
+                    localStorage.removeItem('supabase.auth.token');
+                    localStorage.removeItem('auth_redirect_count');
+                    return;
+                }
+                
+                console.log('Valid auth token found, redirecting to index.html');
+                
+                // Add a redirect counter to localStorage to detect loops
+                let redirectCount = parseInt(localStorage.getItem('auth_redirect_count') || '0');
+                redirectCount++;
+                localStorage.setItem('auth_redirect_count', redirectCount.toString());
+                
+                // If we've redirected too many times, something is wrong - break the loop
+                if (redirectCount > 2) {
+                    console.error('Too many redirects detected, clearing auth state and staying on login page');
+                    localStorage.removeItem('supabase.auth.token');
+                    sessionStorage.removeItem('supabase.auth.token');
+                    localStorage.removeItem('auth_redirect_count');
+                    
+                    // Show an error message to the user
+                    showMessage('error', 'Detected a redirect loop. Auth state has been cleared. Please try logging in again.');
+                    return;
+                }
+                
+                // Redirect to index.html with a slight delay to allow for any cleanup
+                // Use absolute path with no_redirect parameter to prevent loops
+                setTimeout(() => {
+                    console.log('REDIRECTING TO INDEX.HTML');
+                    window.location.href = window.location.origin + '/index.html?no_redirect=true';
+                }, 300);
+            } else {
+                console.log('Invalid token format, clearing token');
+                localStorage.removeItem('supabase.auth.token');
+                localStorage.removeItem('auth_redirect_count');
+            }
+        } else {
+            console.log('No auth token found, staying on login page');
+            localStorage.removeItem('auth_redirect_count');
+        }
+    } catch (error) {
+        console.error('Error checking auth state:', error);
+        // If there's an error parsing the token, it's invalid - remove it
+        localStorage.removeItem('supabase.auth.token');
+        sessionStorage.removeItem('supabase.auth.token');
+        localStorage.removeItem('auth_redirect_count');
+        
+        // Show error message to user
+        showMessage('error', 'There was a problem with your authentication state. Please log in again.');
     }
 }
 

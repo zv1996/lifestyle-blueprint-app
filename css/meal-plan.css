@@ -224,7 +224,7 @@
   margin: 0;
   padding: 15px;
   background-color: var(--background-card);
-  font-size: 1.2rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-color);
@@ -371,7 +371,6 @@
 
 .meal-plan-section h3 {
   margin-top: 0;
-  margin-bottom: 15px;
   font-size: 1.4rem;
   color: var(--text-primary);
   background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));

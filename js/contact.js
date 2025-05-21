@@ -1,12 +1,6 @@
 import { isAuthenticated } from './auth.js';
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Check authentication
-    if (!isAuthenticated() && !window.location.pathname.includes('login.html')) {
-        window.location.href = 'login.html';
-        return;
-    }
-    
     // FAQ toggle functionality
     const faqItems = document.querySelectorAll('.faq-item');
     

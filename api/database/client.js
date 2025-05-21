@@ -362,7 +362,7 @@ async function finalizeMealPlan(mealPlanId) {
  * @param {string} mealPlanId - The meal plan ID
  * @returns {Promise<Array>} The groceries
  */
-async function getGroceriesByMealPlanId(mealPlanId) {
+async function getGroceryListByMealPlanId(mealPlanId) {
   try {
     const { data, error } = await supabase
       .from('groceries')
@@ -377,6 +377,111 @@ async function getGroceriesByMealPlanId(mealPlanId) {
     return data || [];
   } catch (error) {
     console.error('Error getting groceries by meal plan ID:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get groceries for a conversation
+ * @param {string} conversationId - The conversation ID
+ * @returns {Promise<Array>} The groceries
+ */
+async function getGroceryListByConversationId(conversationId) {
+  try {
+    const { data, error } = await supabase
+      .from('groceries')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('category', { ascending: true });
+    
+    if (error) {
+      throw error;
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error getting groceries by conversation ID:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a grocery list
+ * @param {string} userId - The user ID
+ * @param {string} mealPlanId - The meal plan ID
+ * @param {Array} groceries - The groceries to update
+ * @returns {Promise<Array>} The updated groceries
+ */
+async function updateGroceryList(userId, mealPlanId, groceries) {
+  try {
+    // First, get the existing grocery items
+    const existingItems = await getGroceryListByMealPlanId(mealPlanId);
+    
+    // Create a map of existing items by ID
+    const existingItemsMap = {};
+    existingItems.forEach(item => {
+      existingItemsMap[item.id] = item;
+    });
+    
+    // Prepare items to update and items to insert
+    const itemsToUpdate = [];
+    const itemsToInsert = [];
+    
+    groceries.forEach(grocery => {
+      if (grocery.id && existingItemsMap[grocery.id]) {
+        // Update existing item
+        itemsToUpdate.push({
+          id: grocery.id,
+          user_id: userId,
+          meal_plan_id: mealPlanId,
+          ingredient_name: grocery.ingredient_name,
+          quantity: grocery.quantity,
+          unit: grocery.unit,
+          category: grocery.category,
+          updated_at: new Date().toISOString()
+        });
+      } else {
+        // Insert new item
+        itemsToInsert.push({
+          id: crypto.randomUUID(),
+          user_id: userId,
+          meal_plan_id: mealPlanId,
+          ingredient_name: grocery.ingredient_name,
+          quantity: grocery.quantity,
+          unit: grocery.unit,
+          category: grocery.category,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+    });
+    
+    // Update existing items
+    if (itemsToUpdate.length > 0) {
+      const { error: updateError } = await supabase
+        .from('groceries')
+        .upsert(itemsToUpdate);
+      
+      if (updateError) {
+        throw updateError;
+      }
+    }
+    
+    // Insert new items
+    if (itemsToInsert.length > 0) {
+      const { error: insertError } = await supabase
+        .from('groceries')
+        .insert(itemsToInsert);
+      
+      if (insertError) {
+        throw insertError;
+      }
+    }
+    
+    // Get the updated list
+    return await getGroceryListByMealPlanId(mealPlanId);
+  } catch (error) {
+    console.error('Error updating grocery list:', error);
     throw error;
   }
 }
@@ -578,7 +683,7 @@ async function storeGroceryList(userId, mealPlanId, groceries, conversationId = 
       id: crypto.randomUUID(),
       user_id: userId,
       meal_plan_id: mealPlanId,
-      ingredient_name: grocery.ingredientName,
+      ingredient_name: grocery.ingredient_name || grocery.ingredientName,
       quantity: grocery.quantity,
       unit: grocery.unit,
       category: grocery.category,
@@ -747,13 +852,15 @@ module.exports = {
   getCalorieCalculations,
   getMealPlansByUserId,
   getMealPlanById,
-  getGroceriesByMealPlanId,
+  getGroceryListByMealPlanId,
+  getGroceryListByConversationId,
   storeUserInfo,
   storeUserMetricsAndGoals,
   storeUserDietAndMealPreferences,
   storeCalorieCalculations,
   storeMealPlan,
   storeGroceryList,
+  updateGroceryList,
   finalizeMealPlan,
   storeConversationMessage,
   getAllUserData,
