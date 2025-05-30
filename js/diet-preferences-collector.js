@@ -7,6 +7,7 @@
 
 import config from './config.js';
 import { getCurrentUser } from './auth.js';
+import userDataPreloader from './user-data-preloader.js';
 
 // Diet and meal preferences collection states
 const STATES = {
@@ -113,7 +114,7 @@ let uiElements = {
  * @param {Object} elements - UI elements
  * @returns {Object} The collector interface
  */
-function initDietPreferencesCollector(elements) {
+async function initDietPreferencesCollector(elements) {
   // Store UI elements
   uiElements = elements;
   
@@ -137,17 +138,118 @@ function initDietPreferencesCollector(elements) {
   
   console.log('Diet preferences collector initialized with conversation ID:', currentState.conversationId);
   
-  // Show the first question
-  addBotMessage(QUESTIONS[STATES.DIETARY_RESTRICTIONS]);
+  // Feature flag for smart confirmation flows
+  const ENABLE_SMART_CONFIRMATIONS = true;
   
-  // Note: Input field is already enabled by chatbot.js
+  if (ENABLE_SMART_CONFIRMATIONS) {
+    try {
+      // Get confirmation data from preloader
+      const confirmationData = await userDataPreloader.getConfirmationData('dietPreferences');
+      
+      console.log('Diet preferences confirmation data:', confirmationData);
+      
+      if (confirmationData && (confirmationData.hasRestrictions || confirmationData.hasPreferences)) {
+        // User has existing diet data - start smart confirmation flow
+        await startSmartConfirmationFlow(confirmationData);
+        
+        // Return enhanced interface
+        return {
+          processMessage,
+          handleYesNoButtonClick,
+          handleKeepUpdateResponse,
+          isComplete: () => currentState.state === STATES.COMPLETE
+        };
+      }
+      
+      console.log('No existing diet preferences data found, starting normal flow');
+      
+    } catch (error) {
+      console.warn('Smart confirmation failed, falling back to normal flow:', error);
+    }
+  }
+  
+  // Original flow (fallback or new users)
+  startOriginalFlow();
   
   // Return the collector interface
   return {
     processMessage,
     handleYesNoButtonClick,
+    handleKeepUpdateResponse,
     isComplete: () => currentState.state === STATES.COMPLETE
   };
+}
+
+/**
+ * Start the smart confirmation flow for returning users
+ * @param {Object} confirmationData - Existing diet preferences data
+ */
+async function startSmartConfirmationFlow(confirmationData) {
+  console.log('Starting smart confirmation flow for diet preferences');
+  
+  // Show existing data and ask for confirmation
+  const restrictions = confirmationData.restrictions || 'None';
+  const preferences = confirmationData.preferences || 'None specified';
+  
+  addBotMessage(`We have your dietary information on file:`);
+  addBotMessage(`• Dietary restrictions: ${restrictions}`);
+  addBotMessage(`• Food preferences: ${preferences}`);
+  addBotMessage(`Would you like to keep this information or update it?`);
+  
+  // Show Keep/Update buttons
+  showKeepUpdateButtons();
+  setInputEnabled(false);
+  
+  // Store the confirmation data for later use
+  currentState.confirmationData = confirmationData;
+}
+
+/**
+ * Start the original question flow (preserved for fallback)
+ */
+function startOriginalFlow() {
+  console.log('Starting original diet preferences collection flow');
+  
+  // Show the first question
+  addBotMessage(QUESTIONS[STATES.DIETARY_RESTRICTIONS]);
+  
+  // Note: Input field is already enabled by chatbot.js
+}
+
+/**
+ * Handle Keep/Update response
+ * @param {string} response - 'keep' or 'update'
+ */
+function handleKeepUpdateResponse(response) {
+  // Hide Keep/Update buttons
+  hideKeepUpdateButtons();
+  
+  if (response === 'keep') {
+    // User wants to keep existing data
+    addUserMessage('Keep Current Information');
+    storeUserMessage('Keep Current Information');
+    
+    // Populate data with existing information
+    const confirmationData = currentState.confirmationData;
+    currentState.data.dietaryRestrictions = confirmationData.restrictions || 'None';
+    currentState.data.dietaryPreferences = confirmationData.preferences || 'None';
+    
+    // Skip to meal portions question
+    currentState.state = STATES.MEAL_PORTIONS;
+    addBotMessage(QUESTIONS[STATES.MEAL_PORTIONS]);
+    setInputEnabled(true);
+    
+  } else {
+    // User wants to update - start normal flow
+    addUserMessage('Update My Information');
+    storeUserMessage('Update My Information');
+    
+    // Start with dietary restrictions question
+    currentState.state = STATES.DIETARY_RESTRICTIONS;
+    addBotMessage('Let\'s update your dietary information.');
+    addBotMessage(QUESTIONS[STATES.DIETARY_RESTRICTIONS]);
+    setInputEnabled(true);
+  }
 }
 
 /**
@@ -565,6 +667,60 @@ async function storeUserMessage(message) {
   } catch (error) {
     console.error('Error storing conversation message:', error);
     // Continue with processing even if message storage fails
+  }
+}
+
+/**
+ * Show Keep/Update buttons
+ */
+function showKeepUpdateButtons() {
+  // Create Keep/Update buttons if they don't exist
+  if (!uiElements.keepUpdateButtons) {
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.id = 'keepUpdateButtons';
+    buttonsContainer.classList.add('confirmation-buttons');
+    
+    // Create Keep button
+    const keepButton = document.createElement('button');
+    keepButton.classList.add('confirmation-button', 'keep-button');
+    keepButton.textContent = 'Keep Current Information';
+    
+    // Create Update button
+    const updateButton = document.createElement('button');
+    updateButton.classList.add('confirmation-button', 'update-button');
+    updateButton.textContent = 'Update My Information';
+    
+    // Add buttons to container
+    buttonsContainer.appendChild(keepButton);
+    buttonsContainer.appendChild(updateButton);
+    
+    // Insert before chat input
+    const chatInput = document.querySelector('.chat-input');
+    chatInput.parentNode.insertBefore(buttonsContainer, chatInput);
+    
+    // Add event listeners
+    keepButton.addEventListener('click', () => {
+      handleKeepUpdateResponse('keep');
+    });
+    
+    updateButton.addEventListener('click', () => {
+      handleKeepUpdateResponse('update');
+    });
+    
+    // Store reference
+    uiElements.keepUpdateButtons = buttonsContainer;
+  }
+  
+  // Show the buttons
+  uiElements.keepUpdateButtons.style.display = 'flex';
+}
+
+/**
+ * Hide Keep/Update buttons
+ */
+function hideKeepUpdateButtons() {
+  if (uiElements.keepUpdateButtons) {
+    uiElements.keepUpdateButtons.style.display = 'none';
   }
 }
 

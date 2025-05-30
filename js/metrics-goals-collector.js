@@ -7,6 +7,7 @@
 
 import config from './config.js';
 import { getCurrentUser } from './auth.js';
+import userDataPreloader from './user-data-preloader.js';
 
 // Metrics and goals collection states
 const STATES = {
@@ -126,7 +127,7 @@ let uiElements = {
  * @param {Object} elements - UI elements
  * @returns {Object} The collector interface
  */
-function initMetricsAndGoalsCollector(elements) {
+async function initMetricsAndGoalsCollector(elements) {
   // Store UI elements
   uiElements = elements;
   
@@ -144,18 +145,224 @@ function initMetricsAndGoalsCollector(elements) {
   
   console.log('Metrics and goals collector initialized with conversation ID:', currentState.conversationId);
   
-  // Show the height question
-  addBotMessage(QUESTIONS[STATES.HEIGHT]);
+  // Feature flag for smart confirmation flows
+  const ENABLE_SMART_CONFIRMATIONS = true;
   
-  // Note: Input field is already enabled by chatbot.js
+  if (ENABLE_SMART_CONFIRMATIONS) {
+    try {
+      // Get confirmation data from preloader
+      const confirmationData = await userDataPreloader.getConfirmationData('metrics');
+      
+      console.log('Metrics confirmation data:', confirmationData);
+      
+      if (confirmationData && confirmationData.hasHeight) {
+        // User has existing height data - start smart confirmation flow
+        await startSmartConfirmationFlow(confirmationData);
+        
+        // Return enhanced interface
+        return {
+          processMessage,
+          handleActivityLevelSelect,
+          handleFitnessGoalClick,
+          handleConfirmationResponse,
+          isComplete: () => currentState.state === STATES.COMPLETE
+        };
+      }
+      
+      console.log('No existing height data found, starting normal flow');
+      
+    } catch (error) {
+      console.warn('Smart confirmation failed, falling back to normal flow:', error);
+    }
+  }
+  
+  // Original flow (fallback or new users)
+  startOriginalFlow();
   
   // Return the collector interface
   return {
     processMessage,
     handleActivityLevelSelect,
     handleFitnessGoalClick,
+    handleConfirmationResponse,
     isComplete: () => currentState.state === STATES.COMPLETE
   };
+}
+
+/**
+ * Start the smart confirmation flow for returning users
+ * @param {Object} confirmationData - Existing metrics data
+ */
+async function startSmartConfirmationFlow(confirmationData) {
+  console.log('Starting smart confirmation flow for metrics');
+  
+  // Store existing height
+  currentState.data.heightInches = confirmationData.height;
+  
+  // Store the confirmation data for later use
+  currentState.confirmationData = confirmationData;
+  
+  // Show height confirmation
+  showHeightConfirmation();
+}
+
+/**
+ * Start the original question flow (preserved for fallback)
+ */
+function startOriginalFlow() {
+  console.log('Starting original metrics collection flow');
+  
+  // Show the height question
+  addBotMessage(QUESTIONS[STATES.HEIGHT]);
+  
+  // Note: Input field is already enabled by chatbot.js
+}
+
+/**
+ * Handle confirmation responses (Yes/No buttons)
+ * @param {string} response - 'yes' or 'no'
+ * @param {string} type - 'height', 'activity' or 'fitness_goal'
+ */
+function handleConfirmationResponse(response, type) {
+  // Hide confirmation buttons
+  hideConfirmationButtons();
+  
+  if (response === 'yes') {
+    // User confirmed existing data
+    addUserMessage('Yes, that\'s correct');
+    storeUserMessage('Yes, that\'s correct');
+    
+    if (type === 'height') {
+      // Keep existing height and move to weight question
+      currentState.state = STATES.WEIGHT;
+      addBotMessage(QUESTIONS[STATES.WEIGHT]);
+      setInputEnabled(true);
+    } else if (type === 'activity') {
+      // Keep existing activity level and move to fitness goal
+      currentState.data.activityLevel = currentState.confirmationData.activityLevel;
+      
+      if (currentState.confirmationData.hasFitnessGoal) {
+        // Show fitness goal confirmation
+        showFitnessGoalConfirmation();
+      } else {
+        // Show fitness goal selection
+        currentState.state = STATES.FITNESS_GOAL;
+        addBotMessage(QUESTIONS[STATES.FITNESS_GOAL]);
+        showFitnessGoalButtons();
+      }
+    } else if (type === 'fitness_goal') {
+      // Keep existing fitness goal and complete
+      currentState.data.healthFitnessGoal = currentState.confirmationData.fitnessGoal;
+      completeMetricsCollection();
+    }
+  } else {
+    // User wants to update - show original options
+    addUserMessage('No, I need to update it');
+    storeUserMessage('No, I need to update it');
+    
+    if (type === 'height') {
+      // Show height input
+      currentState.state = STATES.HEIGHT;
+      addBotMessage('Please enter your current height in inches:');
+      setInputEnabled(true);
+    } else if (type === 'activity') {
+      // Show activity level dropdown
+      currentState.state = STATES.ACTIVITY_LEVEL;
+      addBotMessage(QUESTIONS[STATES.ACTIVITY_LEVEL]);
+      showActivityLevelDropdown();
+      setInputEnabled(false);
+    } else if (type === 'fitness_goal') {
+      // Show fitness goal buttons
+      currentState.state = STATES.FITNESS_GOAL;
+      addBotMessage(QUESTIONS[STATES.FITNESS_GOAL]);
+      showFitnessGoalButtons();
+    }
+  }
+}
+
+/**
+ * Show height confirmation
+ */
+function showHeightConfirmation() {
+  const height = currentState.confirmationData.height;
+  const heightFeet = Math.floor(height / 12);
+  const heightInches = height % 12;
+  const heightDisplay = `${heightFeet}'${heightInches}"`;
+  
+  addBotMessage(`Based on the information we have, your height is ${heightDisplay} (${height} inches). Is this correct?`);
+  showConfirmationButtons('height');
+  setInputEnabled(false);
+}
+
+/**
+ * Show activity level confirmation
+ */
+function showActivityLevelConfirmation() {
+  const activityLevel = currentState.confirmationData.activityLevel;
+  
+  // Check if activityLevel is just a number/value, and map it to full description
+  let displayActivityLevel = activityLevel;
+  
+  // If it's just a number (like "3"), find the corresponding description
+  if (/^[1-5]$/.test(activityLevel)) {
+    const matchedLevel = ACTIVITY_LEVELS.find(level => level.value === activityLevel);
+    if (matchedLevel) {
+      displayActivityLevel = `${matchedLevel.label}: ${matchedLevel.description}`;
+    }
+  }
+  
+  addBotMessage(`Is your activity level still: ${displayActivityLevel}?`);
+  showConfirmationButtons('activity');
+  setInputEnabled(false);
+}
+
+/**
+ * Show fitness goal confirmation
+ */
+function showFitnessGoalConfirmation() {
+  const fitnessGoal = currentState.confirmationData.fitnessGoal;
+  
+  // Check if fitnessGoal is a code/value, and map it to user-friendly label
+  let displayFitnessGoal = fitnessGoal;
+  
+  // If it's a code (like "LOSE_WEIGHT") or number, find the corresponding label
+  const matchedGoal = FITNESS_GOALS.find(goal => 
+    goal.value === fitnessGoal || goal.value === fitnessGoal?.toUpperCase()
+  );
+  
+  if (matchedGoal) {
+    displayFitnessGoal = matchedGoal.label;
+  }
+  
+  addBotMessage(`Is your fitness goal still: ${displayFitnessGoal}?`);
+  showConfirmationButtons('fitness_goal');
+  setInputEnabled(false);
+}
+
+/**
+ * Complete the metrics collection process
+ */
+async function completeMetricsCollection() {
+  try {
+    await storeMetricsAndGoals();
+    
+    // Move to the complete state
+    currentState.state = STATES.COMPLETE;
+    
+    // Get the user's first name from the URL or use a default
+    const urlParams = new URLSearchParams(window.location.search);
+    const firstName = urlParams.get('firstName') || 'there';
+    
+    // Show a completion message
+    addBotMessage(`Thank you, ${firstName}! Now, let's talk about your dietary and meal preferences.`);
+    
+    // Trigger a custom event to notify chatbot.js to transition to the diet preferences stage
+    const event = new CustomEvent('metricsGoalsComplete');
+    document.dispatchEvent(event);
+  } catch (error) {
+    console.error('Error storing metrics and goals:', error);
+    addBotMessage('Sorry, there was an error saving your information. Please try again.');
+  }
 }
 
 /**
@@ -266,15 +473,25 @@ async function processMessage(message) {
       // Store the weight
       currentState.data.weightPounds = parseFloat(message);
       
-      // Move to the next state
-      currentState.state = STATES.ACTIVITY_LEVEL;
-      addBotMessage(QUESTIONS[currentState.state]);
-      
-      // Show the activity level dropdown
-      showActivityLevelDropdown();
-      
-      // Disable the text input
-      setInputEnabled(false);
+      // Check if we have confirmation data (smart confirmation flow)
+      if (currentState.confirmationData) {
+        // Smart confirmation flow - check existing activity level
+        if (currentState.confirmationData.hasActivityLevel) {
+          showActivityLevelConfirmation();
+        } else {
+          // No existing activity level - show dropdown
+          currentState.state = STATES.ACTIVITY_LEVEL;
+          addBotMessage(QUESTIONS[currentState.state]);
+          showActivityLevelDropdown();
+          setInputEnabled(false);
+        }
+      } else {
+        // Original flow - show activity level dropdown
+        currentState.state = STATES.ACTIVITY_LEVEL;
+        addBotMessage(QUESTIONS[currentState.state]);
+        showActivityLevelDropdown();
+        setInputEnabled(false);
+      }
       break;
       
     // Activity level is now handled directly in handleActivityLevelSelect
@@ -535,6 +752,92 @@ async function storeUserMessage(message) {
   } catch (error) {
     console.error('Error storing conversation message:', error);
     // Continue with processing even if message storage fails
+  }
+}
+
+/**
+ * Show confirmation buttons (Yes/No)
+ * @param {string} type - The type of confirmation ('height', 'activity' or 'fitness_goal')
+ */
+function showConfirmationButtons(type) {
+  // Create confirmation buttons if they don't exist
+  if (!uiElements.confirmationButtons) {
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.id = 'confirmationButtons';
+    buttonsContainer.classList.add('confirmation-buttons');
+    
+    // Create Yes button
+    const yesButton = document.createElement('button');
+    yesButton.classList.add('confirmation-button', 'yes-button');
+    yesButton.textContent = 'Yes, that\'s correct';
+    
+    // Create No button
+    const noButton = document.createElement('button');
+    noButton.classList.add('confirmation-button', 'no-button');
+    noButton.textContent = 'No, I need to update it';
+    
+    // Add buttons to container
+    buttonsContainer.appendChild(yesButton);
+    buttonsContainer.appendChild(noButton);
+    
+    // Insert before chat input
+    const chatInput = document.querySelector('.chat-input');
+    chatInput.parentNode.insertBefore(buttonsContainer, chatInput);
+    
+    // Store reference
+    uiElements.confirmationButtons = buttonsContainer;
+    uiElements.yesButton = yesButton;
+    uiElements.noButton = noButton;
+  }
+  
+  // Update button text based on type
+  const yesButton = uiElements.yesButton;
+  const noButton = uiElements.noButton;
+  
+  if (type === 'height') {
+    yesButton.textContent = 'Yes, that\'s correct';
+    noButton.textContent = 'No, I need to update it';
+  } else {
+    yesButton.textContent = 'Yes';
+    noButton.textContent = 'No, I\'d like to update this';
+  }
+  
+  // Remove existing listeners
+  yesButton.replaceWith(yesButton.cloneNode(true));
+  noButton.replaceWith(noButton.cloneNode(true));
+  
+  // Get fresh references
+  uiElements.yesButton = uiElements.confirmationButtons.querySelector('.yes-button');
+  uiElements.noButton = uiElements.confirmationButtons.querySelector('.no-button');
+  
+  // Update text again after cloning
+  if (type === 'height') {
+    uiElements.yesButton.textContent = 'Yes, that\'s correct';
+    uiElements.noButton.textContent = 'No, I need to update it';
+  } else {
+    uiElements.yesButton.textContent = 'Yes';
+    uiElements.noButton.textContent = 'No, I\'d like to update this';
+  }
+  
+  // Add new event listeners
+  uiElements.yesButton.addEventListener('click', () => {
+    handleConfirmationResponse('yes', type);
+  });
+  
+  uiElements.noButton.addEventListener('click', () => {
+    handleConfirmationResponse('no', type);
+  });
+  
+  // Show the buttons
+  uiElements.confirmationButtons.style.display = 'flex';
+}
+
+/**
+ * Hide confirmation buttons
+ */
+function hideConfirmationButtons() {
+  if (uiElements.confirmationButtons) {
+    uiElements.confirmationButtons.style.display = 'none';
   }
 }
 

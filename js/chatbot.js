@@ -99,13 +99,13 @@ function initChatbot() {
   });
   
   // Add event listener for basic info completion
-  document.addEventListener('basicInfoComplete', () => {
+  document.addEventListener('basicInfoComplete', async () => {
     // Transition to the metrics stage
     currentState.stage = STAGES.METRICS_GOALS;
     console.log('Transitioning to METRICS_GOALS stage (via event)');
     
-    // Initialize the metrics and goals collector
-    metricsAndGoalsCollector = initMetricsAndGoalsCollector({
+    // Initialize the metrics and goals collector (async)
+    metricsAndGoalsCollector = await initMetricsAndGoalsCollector({
       chatMessages: document.getElementById('chatMessages'),
       userInput: document.getElementById('userInput'),
       sendButton: document.getElementById('sendButton'),
@@ -117,13 +117,13 @@ function initChatbot() {
   });
   
   // Add event listener for metrics and goals completion
-  document.addEventListener('metricsGoalsComplete', () => {
+  document.addEventListener('metricsGoalsComplete', async () => {
     // Transition to the diet preferences stage
     currentState.stage = STAGES.DIET_PREFERENCES;
     console.log('Transitioning to DIET_PREFERENCES stage (via event)');
     
-    // Initialize the diet preferences collector
-    dietPreferencesCollector = initDietPreferencesCollector({
+    // Initialize the diet preferences collector (async)
+    dietPreferencesCollector = await initDietPreferencesCollector({
       chatMessages: document.getElementById('chatMessages'),
       userInput: document.getElementById('userInput'),
       sendButton: document.getElementById('sendButton'),
@@ -273,7 +273,7 @@ async function handleSendMessage() {
         
         // Initialize the metrics and goals collector and start it immediately
         // This will show the first question of the metrics stage right after the basic info completion message
-        metricsAndGoalsCollector = initMetricsAndGoalsCollector({
+        metricsAndGoalsCollector = await initMetricsAndGoalsCollector({
           chatMessages: document.getElementById('chatMessages'),
           userInput: document.getElementById('userInput'),
           sendButton: document.getElementById('sendButton'),

@@ -22,33 +22,27 @@ async function initMealHistory() {
   try {
     // Show loading state immediately
     showLoadingState();
-    
-    // Wait for auth to be initialized before checking user
-    console.log('Waiting for auth initialization...');
+
+    // Wait for authentication to be ready
     await waitForAuth();
-    console.log('Auth initialization complete');
-    
-    // Get the current user
     const user = getCurrentUser();
-    
+
     if (!user) {
-      console.error('User not authenticated after auth initialization');
+      console.error('User not authenticated');
       hideLoadingState();
       window.location.href = 'login.html';
       return;
     }
-    
-    console.log('User authenticated, proceeding with meal history initialization');
-    
+
     // Set up event listeners
     setupEventListeners();
-    
+
     // Fetch meal plans
     await fetchMealPlans(user.id);
-    
+
     // Apply initial filters
     applyFilters();
-    
+
     // Hide loading state
     hideLoadingState();
   } catch (error) {
@@ -86,6 +80,50 @@ function setupEventListeners() {
     });
   }
   
+  // Delegate event listener for meal plan cards
+  document.addEventListener('click', async (event) => {
+    // View Plan button
+    if (event.target.classList.contains('view-btn') && !event.target.classList.contains('shopping-list')) {
+      const mealPlanCard = event.target.closest('.meal-plan-card');
+      if (mealPlanCard && mealPlanCard.dataset.id) {
+        await viewMealPlan(mealPlanCard.dataset.id);
+      }
+    }
+    
+    // View Shopping List button
+    if (event.target.classList.contains('view-btn') && event.target.classList.contains('shopping-list')) {
+      const mealPlanCard = event.target.closest('.meal-plan-card');
+      if (mealPlanCard && mealPlanCard.dataset.id) {
+        await viewShoppingList(mealPlanCard.dataset.id);
+      }
+    }
+    
+    // Favorite checkbox
+    if (event.target.closest('.favorite-checkbox input')) {
+      const checkbox = event.target;
+      const mealPlanCard = checkbox.closest('.meal-plan-card');
+      if (mealPlanCard && mealPlanCard.dataset.id) {
+        await toggleFavorite(mealPlanCard.dataset.id, checkbox.checked);
+      }
+    }
+    
+    // Clone button
+    if (event.target.closest('.action-btn[aria-label="Clone"]')) {
+      const mealPlanCard = event.target.closest('.meal-plan-card');
+      if (mealPlanCard && mealPlanCard.dataset.id) {
+        await cloneMealPlan(mealPlanCard.dataset.id);
+      }
+    }
+    
+    // Share button
+    if (event.target.closest('.action-btn[aria-label="Share"]')) {
+      const mealPlanCard = event.target.closest('.meal-plan-card');
+      if (mealPlanCard && mealPlanCard.dataset.id) {
+        await shareMealPlan(mealPlanCard.dataset.id);
+      }
+    }
+  });
+  
   // Pagination buttons
   document.addEventListener('click', (event) => {
     // Previous page button
@@ -117,58 +155,413 @@ function setupEventListeners() {
         updatePagination();
       }
     }
+  });
+}
+
+/**
+ * View a meal plan
+ * @param {string} mealPlanId - The meal plan ID
+ */
+async function viewMealPlan(mealPlanId) {
+  try {
+    // Show loading state
+    showMessage('Loading meal plan...');
     
-    // View Plan button
-    if (event.target.classList.contains('view-btn') && !event.target.classList.contains('shopping-list')) {
-      const mealPlanCard = event.target.closest('.meal-plan-card');
-      if (mealPlanCard && mealPlanCard.dataset.id) {
-        viewMealPlan(mealPlanCard.dataset.id);
-      }
+    // Fetch the meal plan data
+    const response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/${mealPlanId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Error loading meal plan: ${response.statusText}`);
     }
     
-    // View Shopping List button
-    if (event.target.classList.contains('view-btn') && event.target.classList.contains('shopping-list')) {
-      const mealPlanCard = event.target.closest('.meal-plan-card');
-      if (mealPlanCard && mealPlanCard.dataset.id) {
-        viewShoppingList(mealPlanCard.dataset.id);
-      }
+    // Parse the response
+    const mealPlanData = await response.json();
+    
+    // Import the MealPlanViewOverlay class
+    const { MealPlanViewOverlay } = await import('./meal-plan-view-overlay.js');
+    
+    // Create and show the overlay
+    const overlay = new MealPlanViewOverlay({
+      mealPlan: mealPlanData
+    });
+    
+    overlay.show();
+  } catch (error) {
+    console.error('Error viewing meal plan:', error);
+    showErrorMessage('Failed to load meal plan. Please try again later.');
+  }
+}
+
+/**
+ * View a shopping list
+ * @param {string} mealPlanId - The meal plan ID
+ */
+async function viewShoppingList(mealPlanId) {
+  try {
+    console.log('Loading shopping list for meal plan ID:', mealPlanId);
+    
+    // Show loading state
+    showMessage('Loading shopping list...');
+    
+    // Fetch the shopping list data
+    const response = await fetch(`${config.getApiBaseUrl()}/api/shopping-list/by-meal-plan/${mealPlanId}`);
+    
+    console.log('Shopping list API response status:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`Error loading shopping list: ${response.statusText}`);
     }
     
-    // Clone button
-    if (event.target.closest('.action-btn[aria-label="Clone"]')) {
-      const mealPlanCard = event.target.closest('.meal-plan-card');
-      if (mealPlanCard && mealPlanCard.dataset.id) {
-        cloneMealPlan(mealPlanCard.dataset.id);
-      }
+    // Parse the response
+    const data = await response.json();
+    console.log('Shopping list data received:', data);
+    
+    // Prepare shopping list data
+    const shoppingListData = {
+      items: data.items || [],
+      mealPlanId: mealPlanId
+    };
+    
+    console.log('Prepared shopping list data:', shoppingListData);
+    
+    // Import the ShoppingListViewOverlay class
+    const { ShoppingListViewOverlay } = await import('./shopping-list-view-overlay.js');
+    
+    // Create and show the overlay
+    const overlay = new ShoppingListViewOverlay({
+      shoppingList: shoppingListData
+    });
+    
+    console.log('Created shopping list overlay, showing now...');
+    overlay.show();
+  } catch (error) {
+    console.error('Error viewing shopping list:', error);
+    showErrorMessage('Failed to load shopping list. Please try again later.');
+  }
+}
+
+// Track cloning operations to prevent duplicates
+const cloningInProgress = new Set();
+
+// Track sharing operations to prevent duplicates
+const sharingInProgress = new Set();
+
+/**
+ * Share a meal plan
+ * @param {string} mealPlanId - The meal plan ID to share
+ */
+async function shareMealPlan(mealPlanId) {
+  try {
+    // Prevent duplicate sharing operations
+    if (sharingInProgress.has(mealPlanId)) {
+      console.log('Share operation already in progress for meal plan:', mealPlanId);
+      return;
     }
     
-    // Download button
-    if (event.target.closest('.action-btn[aria-label="Download"]')) {
-      const mealPlanCard = event.target.closest('.meal-plan-card');
-      if (mealPlanCard && mealPlanCard.dataset.id) {
-        downloadMealPlan(mealPlanCard.dataset.id);
-      }
+    // Get the current user
+    const user = getCurrentUser();
+    
+    if (!user) {
+      console.error('User not authenticated');
+      showErrorMessage('Please log in to share meal plans.');
+      return;
     }
     
-    // Share button
-    if (event.target.closest('.action-btn[aria-label="Share"]')) {
-      const mealPlanCard = event.target.closest('.meal-plan-card');
-      if (mealPlanCard && mealPlanCard.dataset.id) {
-        shareMealPlan(mealPlanCard.dataset.id);
-      }
+    console.log('Sharing meal plan:', mealPlanId);
+    
+    // Mark this meal plan as being shared
+    sharingInProgress.add(mealPlanId);
+    
+    // Disable the share button for this meal plan
+    const mealPlanCard = document.querySelector(`[data-id="${mealPlanId}"]`);
+    const shareButton = mealPlanCard?.querySelector('.action-btn[aria-label="Share"]');
+    if (shareButton) {
+      shareButton.disabled = true;
+      shareButton.style.opacity = '0.5';
+      shareButton.style.cursor = 'not-allowed';
+    }
+    
+    // Show loading state
+    showMessage('Generating share link...');
+    
+    // Call the share API
+    const response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/${mealPlanId}/share`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: user.id
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Error creating share link: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Share link created successfully:', data);
+    
+    // Show the share overlay with the generated URL
+    showShareOverlay(data.shareUrl, data.expiresAt);
+    
+  } catch (error) {
+    console.error('Error sharing meal plan:', error);
+    showErrorMessage(error.message || 'Failed to create share link. Please try again later.');
+  } finally {
+    // Always clean up - remove from sharing set and re-enable button
+    sharingInProgress.delete(mealPlanId);
+    
+    // Re-enable the share button for this meal plan
+    const mealPlanCard = document.querySelector(`[data-id="${mealPlanId}"]`);
+    const shareButton = mealPlanCard?.querySelector('.action-btn[aria-label="Share"]');
+    if (shareButton) {
+      shareButton.disabled = false;
+      shareButton.style.opacity = '';
+      shareButton.style.cursor = '';
+    }
+  }
+}
+
+/**
+ * Show the share overlay with the generated URL
+ * @param {string} shareUrl - The share URL
+ * @param {string} expiresAt - When the share link expires
+ */
+function showShareOverlay(shareUrl, expiresAt) {
+  // Create the overlay
+  const overlay = document.createElement('div');
+  overlay.classList.add('share-overlay');
+  overlay.innerHTML = `
+    <div class="share-overlay-content">
+      <div class="share-header">
+        <h3>Share Meal Plan</h3>
+        <button class="close-btn" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="share-content">
+        <p class="share-description">Anyone with this link can view your meal plan and shopping list (no account required).</p>
+        
+        <div class="share-url-container">
+          <input type="text" class="share-url" value="${window.location.origin}${shareUrl}" readonly>
+          <button class="copy-btn" title="Copy to clipboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        
+        <p class="share-expiry">Link expires on ${new Date(expiresAt).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })}</p>
+      </div>
+    </div>
+  `;
+  
+  // Add event listeners
+  const closeBtn = overlay.querySelector('.close-btn');
+  const copyBtn = overlay.querySelector('.copy-btn');
+  const shareUrlInput = overlay.querySelector('.share-url');
+  
+  // Close overlay
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+  });
+  
+  // Copy URL to clipboard
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrlInput.value);
+      
+      // Show success feedback
+      copyBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      `;
+      copyBtn.style.background = 'linear-gradient(to right, var(--gradient-start), var(--gradient-end))';
+      
+      // Show success message
+      showMessage('Link copied to clipboard!');
+      
+      // Reset button after 2 seconds
+      setTimeout(() => {
+        copyBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        `;
+        copyBtn.style.background = '';
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      
+      // Fallback: select the text
+      shareUrlInput.select();
+      shareUrlInput.setSelectionRange(0, 99999); // For mobile devices
+      
+      showMessage('Please copy the selected text');
     }
   });
   
-  // Favorite checkbox
-  document.addEventListener('change', (event) => {
-    if (event.target.closest('.favorite-checkbox input')) {
-      const checkbox = event.target;
-      const mealPlanCard = checkbox.closest('.meal-plan-card');
-      if (mealPlanCard && mealPlanCard.dataset.id) {
-        toggleFavorite(mealPlanCard.dataset.id, checkbox.checked);
-      }
+  // Close overlay when clicking outside
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) {
+      overlay.remove();
     }
   });
+  
+  // Add to page
+  document.body.appendChild(overlay);
+  
+  // Focus the input for easy copying
+  shareUrlInput.focus();
+  shareUrlInput.select();
+}
+
+/**
+ * Clone a meal plan
+ * @param {string} mealPlanId - The meal plan ID to clone
+ */
+async function cloneMealPlan(mealPlanId) {
+  try {
+    // Prevent duplicate cloning operations
+    if (cloningInProgress.has(mealPlanId)) {
+      console.log('Clone operation already in progress for meal plan:', mealPlanId);
+      return;
+    }
+    
+    // Get the current user
+    const user = getCurrentUser();
+    
+    if (!user) {
+      console.error('User not authenticated');
+      showErrorMessage('Please log in to clone meal plans.');
+      return;
+    }
+    
+    console.log('Cloning meal plan:', mealPlanId);
+    
+    // Mark this meal plan as being cloned
+    cloningInProgress.add(mealPlanId);
+    
+    // Disable the clone button for this meal plan
+    const mealPlanCard = document.querySelector(`[data-id="${mealPlanId}"]`);
+    const cloneButton = mealPlanCard?.querySelector('.action-btn[aria-label="Clone"]');
+    if (cloneButton) {
+      cloneButton.disabled = true;
+      cloneButton.style.opacity = '0.5';
+      cloneButton.style.cursor = 'not-allowed';
+    }
+    
+    // Show loading state
+    showMessage('Cloning meal plan...');
+    
+    // Call the clone API
+    const response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/clone/${mealPlanId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: user.id
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Error cloning meal plan: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Meal plan cloned successfully:', data);
+    
+    // Show success message
+    showMessage('Meal plan cloned successfully!');
+    
+    // Refresh the meal plans list to show the new cloned plan
+    await fetchMealPlans(user.id);
+    
+    // Apply filters to update the UI (this will show the new plan at the top)
+    applyFilters();
+    
+  } catch (error) {
+    console.error('Error cloning meal plan:', error);
+    showErrorMessage(error.message || 'Failed to clone meal plan. Please try again later.');
+  } finally {
+    // Always clean up - remove from cloning set and re-enable button
+    cloningInProgress.delete(mealPlanId);
+    
+    // Re-enable the clone button for this meal plan
+    const mealPlanCard = document.querySelector(`[data-id="${mealPlanId}"]`);
+    const cloneButton = mealPlanCard?.querySelector('.action-btn[aria-label="Clone"]');
+    if (cloneButton) {
+      cloneButton.disabled = false;
+      cloneButton.style.opacity = '';
+      cloneButton.style.cursor = '';
+    }
+  }
+}
+
+/**
+ * Toggle favorite status for a meal plan
+ * @param {string} mealPlanId - The meal plan ID
+ * @param {boolean} isFavorite - Whether the meal plan is a favorite
+ */
+async function toggleFavorite(mealPlanId, isFavorite) {
+  try {
+    // Get the current user
+    const user = getCurrentUser();
+    
+    if (!user) {
+      console.error('User not authenticated');
+      return;
+    }
+    
+    // Update the meal plan in the database
+    const response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/${mealPlanId}/favorite`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: user.id,
+        isFavorite
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error updating favorite status: ${response.statusText}`);
+    }
+    
+    // Update the meal plan in the local state
+    allMealPlans = allMealPlans.map(mealPlan => {
+      if (mealPlan.meal_plan_id === mealPlanId) {
+        return {
+          ...mealPlan,
+          is_favorite: isFavorite
+        };
+      }
+      return mealPlan;
+    });
+    
+    // Apply filters to update the UI
+    applyFilters();
+  } catch (error) {
+    console.error('Error toggling favorite:', error);
+    showErrorMessage('Failed to update favorite status. Please try again later.');
+  }
 }
 
 /**
@@ -201,6 +594,108 @@ async function fetchMealPlans(userId) {
     console.error('Error fetching meal plans:', error);
     throw error;
   }
+}
+
+/**
+ * Apply filters to the meal plans
+ */
+function applyFilters() {
+  // Get filter values
+  const searchTerm = document.querySelector('.search-bar input')?.value.toLowerCase() || '';
+  const sortBy = document.getElementById('sortBy')?.value || 'newest';
+  const filterBy = document.getElementById('filterBy')?.value || 'all';
+  
+  // Filter meal plans
+  filteredMealPlans = allMealPlans.filter(mealPlan => {
+    // Apply search filter
+    if (searchTerm) {
+      const title = mealPlan.title || '';
+      const description = getMealPlanDescription(mealPlan) || '';
+      
+      if (!title.toLowerCase().includes(searchTerm) && !description.toLowerCase().includes(searchTerm)) {
+        return false;
+      }
+    }
+    
+    // Apply favorites filter
+    if (filterBy === 'favorites' && !mealPlan.is_favorite) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Sort meal plans
+  filteredMealPlans.sort((a, b) => {
+    if (sortBy === 'newest') {
+      return new Date(b.created_at) - new Date(a.created_at);
+    } else if (sortBy === 'oldest') {
+      return new Date(a.created_at) - new Date(b.created_at);
+    } else if (sortBy === 'name') {
+      return (a.title || '').localeCompare(b.title || '');
+    }
+    
+    return 0;
+  });
+  
+  // Reset to first page
+  currentPage = 1;
+  
+  // Render meal plans
+  renderMealPlans();
+  
+  // Update pagination
+  updatePagination();
+}
+
+/**
+ * Get a description of a meal plan
+ * @param {Object} mealPlan - The meal plan
+ * @returns {string} The description
+ */
+function getMealPlanDescription(mealPlan) {
+  const meals = [];
+  
+  // Get meal names
+  for (let day = 1; day <= 5; day++) {
+    for (const mealType of ['breakfast', 'lunch', 'dinner']) {
+      const nameKey = `${mealType}_${day}_name`;
+      if (mealPlan[nameKey]) {
+        meals.push(mealPlan[nameKey]);
+      }
+    }
+  }
+  
+  // Get snack names
+  if (mealPlan.snack_1_name) {
+    meals.push(mealPlan.snack_1_name);
+  }
+  
+  if (mealPlan.snack_2_name) {
+    meals.push(mealPlan.snack_2_name);
+  }
+  
+  // Get favorite meal names
+  if (mealPlan.favorite_meal_1_name) {
+    meals.push(mealPlan.favorite_meal_1_name);
+  }
+  
+  if (mealPlan.favorite_meal_2_name) {
+    meals.push(mealPlan.favorite_meal_2_name);
+  }
+  
+  // Return a description
+  if (meals.length > 0) {
+    // Get unique meals
+    const uniqueMeals = [...new Set(meals)];
+    
+    // Limit to 4 meals
+    const limitedMeals = uniqueMeals.slice(0, 4);
+    
+    return `Includes: ${limitedMeals.join(', ')}${uniqueMeals.length > 4 ? '...' : ''}`;
+  }
+  
+  return '';
 }
 
 /**
@@ -420,476 +915,6 @@ function estimateDailyCalories(mealPlan) {
 }
 
 /**
- * Apply filters to the meal plans
- */
-function applyFilters() {
-  // Get filter values
-  const searchTerm = document.querySelector('.search-bar input')?.value.toLowerCase() || '';
-  const sortBy = document.getElementById('sortBy')?.value || 'newest';
-  const filterBy = document.getElementById('filterBy')?.value || 'all';
-  
-  // Filter meal plans
-  filteredMealPlans = allMealPlans.filter(mealPlan => {
-    // Apply search filter
-    if (searchTerm) {
-      const title = mealPlan.title || '';
-      const description = getMealPlanDescription(mealPlan) || '';
-      
-      if (!title.toLowerCase().includes(searchTerm) && !description.toLowerCase().includes(searchTerm)) {
-        return false;
-      }
-    }
-    
-    // Apply favorites filter
-    if (filterBy === 'favorites' && !mealPlan.is_favorite) {
-      return false;
-    }
-    
-    return true;
-  });
-  
-  // Sort meal plans
-  filteredMealPlans.sort((a, b) => {
-    if (sortBy === 'newest') {
-      return new Date(b.created_at) - new Date(a.created_at);
-    } else if (sortBy === 'oldest') {
-      return new Date(a.created_at) - new Date(b.created_at);
-    } else if (sortBy === 'name') {
-      return (a.title || '').localeCompare(b.title || '');
-    }
-    
-    return 0;
-  });
-  
-  // Reset to first page
-  currentPage = 1;
-  
-  // Render meal plans
-  renderMealPlans();
-  
-  // Update pagination
-  updatePagination();
-}
-
-/**
- * Get a description of a meal plan
- * @param {Object} mealPlan - The meal plan
- * @returns {string} The description
- */
-function getMealPlanDescription(mealPlan) {
-  const meals = [];
-  
-  // Get meal names
-  for (let day = 1; day <= 5; day++) {
-    for (const mealType of ['breakfast', 'lunch', 'dinner']) {
-      const nameKey = `${mealType}_${day}_name`;
-      if (mealPlan[nameKey]) {
-        meals.push(mealPlan[nameKey]);
-      }
-    }
-  }
-  
-  // Get snack names
-  if (mealPlan.snack_1_name) {
-    meals.push(mealPlan.snack_1_name);
-  }
-  
-  if (mealPlan.snack_2_name) {
-    meals.push(mealPlan.snack_2_name);
-  }
-  
-  // Get favorite meal names
-  if (mealPlan.favorite_meal_1_name) {
-    meals.push(mealPlan.favorite_meal_1_name);
-  }
-  
-  if (mealPlan.favorite_meal_2_name) {
-    meals.push(mealPlan.favorite_meal_2_name);
-  }
-  
-  // Return a description
-  if (meals.length > 0) {
-    // Get unique meals
-    const uniqueMeals = [...new Set(meals)];
-    
-    // Limit to 4 meals
-    const limitedMeals = uniqueMeals.slice(0, 4);
-    
-    return `Includes: ${limitedMeals.join(', ')}${uniqueMeals.length > 4 ? '...' : ''}`;
-  }
-  
-  return '';
-}
-
-/**
- * Render meal plans
- */
-function renderMealPlans() {
-  const mealPlansGrid = document.querySelector('.meal-plans-grid');
-  
-  if (!mealPlansGrid) {
-    return;
-  }
-  
-  // Clear existing meal plans
-  mealPlansGrid.innerHTML = '';
-  
-  // Calculate start and end indices for pagination
-  const startIndex = (currentPage - 1) * plansPerPage;
-  const endIndex = startIndex + plansPerPage;
-  
-  // Get meal plans for the current page
-  const mealPlansToShow = filteredMealPlans.slice(startIndex, endIndex);
-  
-  // If no meal plans, show a message
-  if (mealPlansToShow.length === 0) {
-    const noPlansMessage = document.createElement('div');
-    noPlansMessage.classList.add('no-plans-message');
-    noPlansMessage.textContent = 'No meal plans found.';
-    mealPlansGrid.appendChild(noPlansMessage);
-    return;
-  }
-  
-  // Render each meal plan
-  mealPlansToShow.forEach(mealPlan => {
-    const mealPlanCard = createMealPlanCard(mealPlan);
-    mealPlansGrid.appendChild(mealPlanCard);
-  });
-}
-
-/**
- * Create a meal plan card
- * @param {Object} mealPlan - The meal plan
- * @returns {HTMLElement} The meal plan card
- */
-function createMealPlanCard(mealPlan) {
-  const mealPlanCard = document.createElement('div');
-  mealPlanCard.classList.add('meal-plan-card');
-  mealPlanCard.dataset.id = mealPlan.meal_plan_id;
-  
-  // Format date
-  const date = new Date(mealPlan.created_at);
-  const formattedDate = date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-  
-  // Calculate calories and meals
-  const caloriesPerDay = estimateDailyCalories(mealPlan);
-  const totalMeals = countTotalMeals(mealPlan);
-  
-  // Create the card HTML
-  mealPlanCard.innerHTML = `
-    <div class="meal-plan-header">
-      <span class="date">${formattedDate}</span>
-      <label class="favorite-checkbox">
-        <input type="checkbox" class="sr-only" ${mealPlan.is_favorite ? 'checked' : ''}>
-        <svg class="star-icon" viewBox="0 0 24 24">
-          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
-        </svg>
-        <span>Favorite</span>
-      </label>
-    </div>
-    
-    <div class="meal-plan-content">
-      <div class="meal-plan-info">
-        <h3>${mealPlan.title || 'Custom Meal Plan'}</h3>
-        <div class="meal-plan-preview">
-          <p>${getMealPlanDescription(mealPlan)}</p>
-        </div>
-      </div>
-      
-      <div class="meal-plan-stats">
-        <div class="stat">
-          <span class="value">${caloriesPerDay}</span>
-          <span class="label">Calories</span>
-        </div>
-        <div class="stat">
-          <span class="value">${totalMeals}</span>
-          <span class="label">Meals</span>
-        </div>
-      </div>
-    </div>
-    
-    <div class="meal-plan-actions">
-      <div class="primary-actions">
-        <button class="view-btn">View Plan</button>
-        <button class="view-btn shopping-list">View Shopping List</button>
-      </div>
-      
-      <div class="secondary-actions">
-        <button class="action-btn" aria-label="Download" title="Download Meal Plan">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-        </button>
-        <button class="action-btn" aria-label="Clone" title="Clone Meal Plan">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-        </button>
-        <button class="action-btn" aria-label="Share" title="Share Meal Plan">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="18" cy="5" r="3"></circle>
-            <circle cx="6" cy="12" r="3"></circle>
-            <circle cx="18" cy="19" r="3"></circle>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
-  `;
-  
-  return mealPlanCard;
-}
-
-/**
- * Calculate average protein per meal
- * @param {Object} mealPlan - The meal plan
- * @returns {number} The average protein per meal
- */
-function calculateAverageProtein(mealPlan) {
-  let totalProtein = 0;
-  let mealCount = 0;
-  
-  // Sum up protein for each meal
-  for (let day = 1; day <= 5; day++) {
-    for (const mealType of ['breakfast', 'lunch', 'dinner']) {
-      const proteinKey = `${mealType}_${day}_protein`;
-      if (mealPlan[proteinKey] && !isNaN(mealPlan[proteinKey])) {
-        totalProtein += parseInt(mealPlan[proteinKey]);
-        mealCount++;
-      }
-    }
-  }
-  
-  // Calculate average protein per meal
-  return mealCount > 0 ? Math.round(totalProtein / mealCount) : 0;
-}
-
-/**
- * Update pagination
- */
-function updatePagination() {
-  const pagination = document.querySelector('.pagination');
-  
-  if (!pagination) {
-    return;
-  }
-  
-  // Calculate total pages
-  const totalPages = Math.ceil(filteredMealPlans.length / plansPerPage);
-  
-  // Update page numbers
-  const pageNumbers = pagination.querySelector('.page-numbers');
-  
-  if (pageNumbers) {
-    pageNumbers.innerHTML = '';
-    
-    // Add page numbers
-    if (totalPages <= 5) {
-      // Show all pages
-      for (let i = 1; i <= totalPages; i++) {
-        const pageButton = document.createElement('button');
-        pageButton.textContent = i;
-        if (i === currentPage) {
-          pageButton.classList.add('active');
-        }
-        pageNumbers.appendChild(pageButton);
-      }
-    } else {
-      // Show first, current, last, and ellipses
-      
-      // First page
-      const firstPageButton = document.createElement('button');
-      firstPageButton.textContent = '1';
-      if (currentPage === 1) {
-        firstPageButton.classList.add('active');
-      }
-      pageNumbers.appendChild(firstPageButton);
-      
-      // Ellipsis before current page
-      if (currentPage > 2) {
-        const ellipsisBefore = document.createElement('span');
-        ellipsisBefore.textContent = '...';
-        pageNumbers.appendChild(ellipsisBefore);
-      }
-      
-      // Current page (if not first or last)
-      if (currentPage !== 1 && currentPage !== totalPages) {
-        const currentPageButton = document.createElement('button');
-        currentPageButton.textContent = currentPage;
-        currentPageButton.classList.add('active');
-        pageNumbers.appendChild(currentPageButton);
-      }
-      
-      // Ellipsis after current page
-      if (currentPage < totalPages - 1) {
-        const ellipsisAfter = document.createElement('span');
-        ellipsisAfter.textContent = '...';
-        pageNumbers.appendChild(ellipsisAfter);
-      }
-      
-      // Last page
-      const lastPageButton = document.createElement('button');
-      lastPageButton.textContent = totalPages;
-      if (currentPage === totalPages) {
-        lastPageButton.classList.add('active');
-      }
-      pageNumbers.appendChild(lastPageButton);
-    }
-  }
-  
-  // Update previous button
-  const prevButton = pagination.querySelector('.pagination-btn[aria-label="Previous page"]');
-  if (prevButton) {
-    prevButton.disabled = currentPage === 1;
-  }
-  
-  // Update next button
-  const nextButton = pagination.querySelector('.pagination-btn[aria-label="Next page"]');
-  if (nextButton) {
-    nextButton.disabled = currentPage === totalPages;
-  }
-}
-
-/**
- * Toggle favorite status for a meal plan
- * @param {string} mealPlanId - The meal plan ID
- * @param {boolean} isFavorite - Whether the meal plan is a favorite
- */
-async function toggleFavorite(mealPlanId, isFavorite) {
-  try {
-    // Get the current user
-    const user = getCurrentUser();
-    
-    if (!user) {
-      console.error('User not authenticated');
-      return;
-    }
-    
-    // Update the meal plan in the database
-    const response = await fetch(`${config.getApiBaseUrl()}/api/meal-plan/${mealPlanId}/favorite`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: user.id,
-        isFavorite
-      })
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Error updating favorite status: ${response.statusText}`);
-    }
-    
-    // Update the meal plan in the local state
-    allMealPlans = allMealPlans.map(mealPlan => {
-      if (mealPlan.meal_plan_id === mealPlanId) {
-        return {
-          ...mealPlan,
-          is_favorite: isFavorite
-        };
-      }
-      return mealPlan;
-    });
-    
-    // Apply filters to update the UI
-    applyFilters();
-  } catch (error) {
-    console.error('Error toggling favorite:', error);
-    showErrorMessage('Failed to update favorite status. Please try again later.');
-  }
-}
-
-/**
- * View a meal plan
- * @param {string} mealPlanId - The meal plan ID
- */
-function viewMealPlan(mealPlanId) {
-  // Redirect to the meal plan results page
-  window.location.href = `meal-plan-results.html?id=${mealPlanId}`;
-}
-
-/**
- * View a shopping list
- * @param {string} mealPlanId - The meal plan ID
- */
-function viewShoppingList(mealPlanId) {
-  // Redirect to the shopping list page
-  window.location.href = `shopping-list.html?id=${mealPlanId}`;
-}
-
-/**
- * Clone a meal plan
- * @param {string} mealPlanId - The meal plan ID
- */
-function cloneMealPlan(mealPlanId) {
-  // Show a message that this feature is coming soon
-  showMessage('Meal plan cloning feature coming soon!');
-}
-
-/**
- * Download a meal plan
- * @param {string} mealPlanId - The meal plan ID
- */
-function downloadMealPlan(mealPlanId) {
-  // Find the meal plan
-  const mealPlan = allMealPlans.find(plan => plan.meal_plan_id === mealPlanId);
-  
-  if (!mealPlan) {
-    showErrorMessage('Meal plan not found.');
-    return;
-  }
-  
-  try {
-    // Create a JSON string of the meal plan
-    const mealPlanJson = JSON.stringify(mealPlan, null, 2);
-    
-    // Create a blob
-    const blob = new Blob([mealPlanJson], { type: 'application/json' });
-    
-    // Create a URL for the blob
-    const url = URL.createObjectURL(blob);
-    
-    // Create a link element
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `meal-plan-${mealPlanId}.json`;
-    
-    // Append the link to the body
-    document.body.appendChild(link);
-    
-    // Click the link
-    link.click();
-    
-    // Remove the link
-    document.body.removeChild(link);
-    
-    // Show a success message
-    showMessage('Meal plan downloaded successfully!');
-  } catch (error) {
-    console.error('Error downloading meal plan:', error);
-    showErrorMessage('Failed to download meal plan. Please try again later.');
-  }
-}
-
-/**
- * Share a meal plan
- * @param {string} mealPlanId - The meal plan ID
- */
-function shareMealPlan(mealPlanId) {
-  // Show a message that this feature is coming soon
-  showMessage('Meal plan sharing feature coming soon!');
-}
-
-/**
  * Show a loading state
  */
 function showLoadingState() {
@@ -980,6 +1005,241 @@ function showMessage(message) {
       toast.remove();
     }, 300);
   }, 3000);
+}
+
+/**
+ * Render meal plans
+ */
+function renderMealPlans() {
+  const mealPlansGrid = document.querySelector('.meal-plans-grid');
+  
+  if (!mealPlansGrid) {
+    return;
+  }
+  
+  // Clear existing meal plans
+  mealPlansGrid.innerHTML = '';
+  
+  // Calculate start and end indices for pagination
+  const startIndex = (currentPage - 1) * plansPerPage;
+  const endIndex = startIndex + plansPerPage;
+  
+  // Get meal plans for the current page
+  const mealPlansToShow = filteredMealPlans.slice(startIndex, endIndex);
+  
+  // If no meal plans, show a message
+  if (mealPlansToShow.length === 0) {
+    const noPlansMessage = document.createElement('div');
+    noPlansMessage.classList.add('no-plans-message');
+    noPlansMessage.textContent = 'No meal plans found.';
+    mealPlansGrid.appendChild(noPlansMessage);
+    return;
+  }
+  
+  // Render each meal plan
+  mealPlansToShow.forEach(mealPlan => {
+    const mealPlanCard = createMealPlanCard(mealPlan);
+    mealPlansGrid.appendChild(mealPlanCard);
+  });
+}
+
+/**
+ * Create a meal plan card
+ * @param {Object} mealPlan - The meal plan data
+ * @returns {HTMLElement} The meal plan card
+ */
+function createMealPlanCard(mealPlan) {
+  const mealPlanCard = document.createElement('div');
+  mealPlanCard.classList.add('meal-plan-card');
+  mealPlanCard.dataset.id = mealPlan.meal_plan_id;
+  
+  // Format date
+  const date = new Date(mealPlan.created_at);
+  const formattedDate = date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  
+  // Calculate calories and meals
+  const caloriesPerDay = estimateDailyCalories(mealPlan);
+  const totalMeals = countTotalMeals(mealPlan);
+  
+  // Check if this is a cloned meal plan
+  const isCloned = mealPlan.based_on_plan_id || (mealPlan.title && mealPlan.title.startsWith('🔄'));
+  
+  // Create subtitle for cloned plans
+  let cloneSubtitle = '';
+  if (isCloned && mealPlan.based_on_plan_id) {
+    // Find the original meal plan to get its creation date
+    const originalPlan = allMealPlans.find(plan => plan.meal_plan_id === mealPlan.based_on_plan_id);
+    if (originalPlan) {
+      const originalDate = new Date(originalPlan.created_at);
+      const originalFormattedDate = originalDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      cloneSubtitle = `<div class="clone-subtitle">Based on plan from ${originalFormattedDate}</div>`;
+    } else {
+      cloneSubtitle = `<div class="clone-subtitle">Cloned meal plan</div>`;
+    }
+  }
+  
+  // Create the card HTML
+  mealPlanCard.innerHTML = `
+    <div class="meal-plan-header">
+      <span class="date">${formattedDate}</span>
+      <label class="favorite-checkbox">
+        <input type="checkbox" class="sr-only" ${mealPlan.is_favorite ? 'checked' : ''}>
+        <svg class="star-icon" viewBox="0 0 24 24">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+        </svg>
+        <span>Favorite</span>
+      </label>
+    </div>
+    
+    <div class="meal-plan-card-content">
+      <div class="meal-plan-info">
+        <h3 ${isCloned ? 'data-cloned="true"' : ''}>${mealPlan.title || 'Custom Meal Plan'}</h3>
+        ${cloneSubtitle}
+        <div class="meal-plan-preview">
+          <p>${getMealPlanDescription(mealPlan)}</p>
+        </div>
+      </div>
+      
+      <div class="meal-plan-stats">
+        <div class="stat">
+          <span class="value">${caloriesPerDay}</span>
+          <span class="label">Calories</span>
+        </div>
+        <div class="stat">
+          <span class="value">${totalMeals}</span>
+          <span class="label">Meals</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="meal-plan-actions">
+      <div class="primary-actions">
+        <button class="view-btn">View Plan</button>
+        <button class="view-btn shopping-list">View Shopping List</button>
+      </div>
+      
+      <div class="secondary-actions">
+        <button class="action-btn" aria-label="Download" title="Download Meal Plan">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </button>
+        <button class="action-btn" aria-label="Clone" title="Clone Meal Plan">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+        <button class="action-btn" aria-label="Share" title="Share Meal Plan">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `;
+  
+  return mealPlanCard;
+}
+
+/**
+ * Update pagination
+ */
+function updatePagination() {
+  const pagination = document.querySelector('.pagination');
+  
+  if (!pagination) {
+    return;
+  }
+  
+  // Calculate total pages
+  const totalPages = Math.ceil(filteredMealPlans.length / plansPerPage);
+  
+  // Update page numbers
+  const pageNumbers = pagination.querySelector('.page-numbers');
+  
+  if (pageNumbers) {
+    pageNumbers.innerHTML = '';
+    
+    // Add page numbers
+    if (totalPages <= 5) {
+      // Show all pages
+      for (let i = 1; i <= totalPages; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.textContent = i;
+        if (i === currentPage) {
+          pageButton.classList.add('active');
+        }
+        pageNumbers.appendChild(pageButton);
+      }
+    } else {
+      // Show first, current, last, and ellipses
+      
+      // First page
+      const firstPageButton = document.createElement('button');
+      firstPageButton.textContent = '1';
+      if (currentPage === 1) {
+        firstPageButton.classList.add('active');
+      }
+      pageNumbers.appendChild(firstPageButton);
+      
+      // Ellipsis before current page
+      if (currentPage > 2) {
+        const ellipsisBefore = document.createElement('span');
+        ellipsisBefore.textContent = '...';
+        pageNumbers.appendChild(ellipsisBefore);
+      }
+      
+      // Current page (if not first or last)
+      if (currentPage !== 1 && currentPage !== totalPages) {
+        const currentPageButton = document.createElement('button');
+        currentPageButton.textContent = currentPage;
+        currentPageButton.classList.add('active');
+        pageNumbers.appendChild(currentPageButton);
+      }
+      
+      // Ellipsis after current page
+      if (currentPage < totalPages - 1) {
+        const ellipsisAfter = document.createElement('span');
+        ellipsisAfter.textContent = '...';
+        pageNumbers.appendChild(ellipsisAfter);
+      }
+      
+      // Last page
+      const lastPageButton = document.createElement('button');
+      lastPageButton.textContent = totalPages;
+      if (currentPage === totalPages) {
+        lastPageButton.classList.add('active');
+      }
+      pageNumbers.appendChild(lastPageButton);
+    }
+  }
+  
+  // Update previous button
+  const prevButton = pagination.querySelector('.pagination-btn[aria-label="Previous page"]');
+  if (prevButton) {
+    prevButton.disabled = currentPage === 1;
+  }
+  
+  // Update next button
+  const nextButton = pagination.querySelector('.pagination-btn[aria-label="Next page"]');
+  if (nextButton) {
+    nextButton.disabled = currentPage === totalPages;
+  }
 }
 
 // Initialize the meal history page when the DOM is loaded

@@ -1,0 +1,17 @@
+/**
+ * Shopping List View Overlay Styles for Lifestyle Blueprint
+ * 
+ * This stylesheet provides minimal overrides for the shopping list view overlay.
+ * The main styles are inherited from .shopping-list-overlay in shopping-list.css
+ * since the JavaScript applies the same class: 'shopping-list-overlay'
+ * 
+ * This ensures perfect visual consistency between the chatbot overlay and view overlay.
+ */
+
+/* The element inherits all styles from .shopping-list-overlay in shopping-list.css */
+/* Only add overrides here if specific view-only adjustments are needed */
+
+.shopping-list-view-overlay {
+  /* Inherits all styles from .shopping-list-overlay */
+  /* This ensures perfect consistency with the chatbot overlay */
+}

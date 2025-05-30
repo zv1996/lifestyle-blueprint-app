@@ -1,3 +1,7 @@
+// ⚠️ DO NOT modify this file’s auth logic.
+// Auth state is initialized centrally and must be awaited using `waitForAuth()`.
+// Redirects based on session must come AFTER `waitForAuth()` resolves.
+
 // Authentication service for Lifestyle Blueprint app
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm';
 

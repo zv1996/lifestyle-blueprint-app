@@ -850,3 +850,53 @@ footer::after {
 .fitness-goal-button:active {
     transform: translateY(-1px);
 }
+
+/* Confirmation Buttons - Smart Preloading Feature */
+.confirmation-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem;
+    justify-content: flex-start;
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    max-width: 600px;
+}
+
+.confirmation-button {
+    padding: 0.6rem 1.2rem;
+    background: linear-gradient(135deg, #00ff88, #00cc66, #00ff88);
+    background-size: 200% 100%;
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 500;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 255, 136, 0.2);
+}
+
+.confirmation-button:hover {
+    background: linear-gradient(135deg, #00ff88, #00cc66, #00ff88);
+    background-size: 200% 100%;
+    animation: neon-gradient-shift 3s ease infinite;
+    transform: translateY(-2px);
+}
+
+.confirmation-button:active {
+    transform: translateY(-1px);
+}
+
+/* Neon gradient animation keyframes */
+@keyframes neon-gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}

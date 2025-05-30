@@ -144,7 +144,6 @@
     overflow: hidden;
     border: 1px solid var(--border-color);
     transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-    padding: 1.5rem;
     position: relative;
     z-index: 1;
 }
@@ -175,10 +174,11 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
+    padding: 1.5rem;
 }
 
 .meal-plan-header .date {
-    color: var(--text-secondary);
+    color: #fff;
     font-size: 0.9rem;
 }
 
@@ -252,14 +252,49 @@
 }
 
 /* Meal Plan Card Layout */
-.meal-plan-content {
+.meal-plan-card-content {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 1rem;
+    align-items: flex-start;
+    gap: 1.5rem;
+    padding: 1.5rem;
+}
+
+.meal-plan-card-content .meal-plan-info {
+    flex: 2;
+}
+
+.meal-plan-card-content .meal-plan-stats {
+    flex: 1;
+    max-width: 200px;
 }
 
 .meal-plan-info {
     flex: 1;
+}
+
+/* Clone indication styling */
+.meal-plan-card h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.clone-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    font-style: italic;
+    opacity: 0.9;
+    font-weight: 400;
+}
+
+/* Clone icon styling */
+.meal-plan-card h3[data-cloned="true"]::before {
+    content: '🔄';
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-right: 0.25rem;
 }
 
 .meal-plan-card h3 {
@@ -314,6 +349,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 1.5rem;
 }
 
 .primary-actions {
@@ -554,7 +590,7 @@
         font-size: 2.5rem;
     }
     
-    .meal-plan-content {
+    .meal-plan-card-content {
         flex-direction: column;
     }
     
@@ -601,4 +637,273 @@
         right: 1rem;
         max-width: none;
     }
+}
+
+
+
+
+/* Meal Plan View Overlay Styles */
+#meal-plan-view-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+.meal-plan-view-content {
+    background-color: var(--background-card);
+    padding: 2rem;
+    border-radius: 16px;
+    max-width: 1000px;
+    width: 100%;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+}
+
+.day-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.day-container h4 {
+    grid-column: 1 / -1;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.meal-box {
+    background-color: var(--background-light);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.meal-box h5 {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.meal-box p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+.meal-plan-view-content .meal-card {
+    background-color: var(--background-light);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.meal-plan-view-content .meal-card h5 {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+}
+
+.meal-plan-view-content .meal-card p {
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.meal-plan-view-content .day-meals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.meal-plan-view-content .day-header {
+    grid-column: 1 / -1;
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+/* Share Overlay Styles */
+.share-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 10000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.share-overlay-content {
+  background-color: var(--background-card);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3), 0 0 20px var(--shadow-color);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+.share-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+}
+
+.share-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.share-content {
+  padding: 2rem;
+}
+
+.share-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.share-url-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.share-url {
+  flex: 1;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-light);
+  color: var(--text-primary);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.share-url:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.2);
+}
+
+.copy-btn {
+  padding: 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--background-light);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+}
+
+.copy-btn:hover {
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.share-expiry {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Responsive adjustments for share overlay */
+@media (max-width: 576px) {
+  .share-overlay {
+    padding: 1rem;
+  }
+  
+  .share-header {
+    padding: 1rem;
+  }
+  
+  .share-header h3 {
+    font-size: 1.25rem;
+  }
+  
+  .share-content {
+    padding: 1.5rem;
+  }
+  
+  .share-url-container {
+    flex-direction: column;
+  }
+  
+  .copy-btn {
+    width: 100%;
+    justify-content: center;
+  }
 }

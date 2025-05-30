@@ -1,3 +1,7 @@
+// ⚠️ DO NOT modify this file’s auth logic.
+// Auth state is initialized centrally and must be awaited using `waitForAuth()`.
+// Redirects based on session must come AFTER `waitForAuth()` resolves.
+
 import { signIn, signUp, createUserProfile, waitForAuth, isAuthInitialized } from './auth.js';
 
 // Wait for service worker to be ready - using the same implementation as auth.js
@@ -350,95 +354,60 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 // Check if user is already authenticated with improved safeguards against redirect loops
-function checkAuthStateWithSafeguard() {
-    // Make sure auth is initialized before checking state
+async function checkAuthStateWithSafeguard() {
+    // Wait for auth to be fully initialized
     if (!isAuthInitialized()) {
         console.error('Auth not initialized yet, cannot check state');
         return;
     }
-    
-    // Get the URL parameters
+
     const urlParams = new URLSearchParams(window.location.search);
-    
-    // Check if we're in a redirect loop (indicated by a 'no_redirect' parameter)
+
     if (urlParams.has('no_redirect')) {
         console.log('Skipping redirect check due to no_redirect parameter');
-        // Clear any potentially problematic auth tokens if we're in a loop
-        localStorage.removeItem('supabase.auth.token');
-        sessionStorage.removeItem('supabase.auth.token');
         localStorage.removeItem('auth_redirect_count');
         return;
     }
-    
-    // Check for token with a more robust approach
+
     try {
-        const token = localStorage.getItem('supabase.auth.token');
-        if (token) {
-            // Try to parse the token to verify it's valid JSON
-            const parsedToken = JSON.parse(token);
-            
-            // Validate token more thoroughly
-            if (parsedToken && 
-                parsedToken.user && 
-                parsedToken.user.id && 
-                parsedToken.access_token && 
-                parsedToken.expires_at &&
-                !window.location.href.includes('no_redirect')) {
-                
-                // Check if token is expired
-                const expiresAt = new Date(parsedToken.expires_at * 1000);
-                const now = new Date();
-                
-                if (expiresAt <= now) {
-                    console.log('Token is expired, clearing token');
-                    localStorage.removeItem('supabase.auth.token');
-                    localStorage.removeItem('auth_redirect_count');
-                    return;
-                }
-                
-                console.log('Valid auth token found, redirecting to index.html');
-                
-                // Add a redirect counter to localStorage to detect loops
-                let redirectCount = parseInt(localStorage.getItem('auth_redirect_count') || '0');
-                redirectCount++;
-                localStorage.setItem('auth_redirect_count', redirectCount.toString());
-                
-                // If we've redirected too many times, something is wrong - break the loop
-                if (redirectCount > 2) {
-                    console.error('Too many redirects detected, clearing auth state and staying on login page');
-                    localStorage.removeItem('supabase.auth.token');
-                    sessionStorage.removeItem('supabase.auth.token');
-                    localStorage.removeItem('auth_redirect_count');
-                    
-                    // Show an error message to the user
-                    showMessage('error', 'Detected a redirect loop. Auth state has been cleared. Please try logging in again.');
-                    return;
-                }
-                
-                // Redirect to index.html with a slight delay to allow for any cleanup
-                // Use absolute path with no_redirect parameter to prevent loops
-                setTimeout(() => {
-                    console.log('REDIRECTING TO INDEX.HTML');
-                    window.location.href = window.location.origin + '/index.html?no_redirect=true';
-                }, 300);
-            } else {
-                console.log('Invalid token format, clearing token');
-                localStorage.removeItem('supabase.auth.token');
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+            console.error('Error fetching session:', error.message);
+            return;
+        }
+
+        if (session && session.user) {
+            console.log('Active session detected, redirecting to index.html');
+
+            let redirectCount = parseInt(localStorage.getItem('auth_redirect_count') || '0');
+            redirectCount++;
+            localStorage.setItem('auth_redirect_count', redirectCount.toString());
+
+            if (redirectCount > 2) {
+                console.error('Too many redirects detected, clearing auth state');
+                await supabase.auth.signOut();
                 localStorage.removeItem('auth_redirect_count');
+                showMessage('error', 'Detected a redirect loop. Auth state has been cleared. Please try logging in again.');
+                return;
             }
+
+            setTimeout(() => {
+                if (!window.location.pathname.includes('index.html')) {
+                    console.log('Redirecting to index.html');
+                    window.location.href = window.location.origin + '/index.html?no_redirect=true';
+                } else {
+                    console.log('Already on index.html, skipping redirect.');
+                }
+            }, 300);
         } else {
-            console.log('No auth token found, staying on login page');
+            console.log('No active session found, staying on login page');
             localStorage.removeItem('auth_redirect_count');
         }
     } catch (error) {
-        console.error('Error checking auth state:', error);
-        // If there's an error parsing the token, it's invalid - remove it
-        localStorage.removeItem('supabase.auth.token');
-        sessionStorage.removeItem('supabase.auth.token');
+        console.error('Unexpected error during auth check:', error);
+        showMessage('error', 'There was a problem checking your session. Please log in again.');
         localStorage.removeItem('auth_redirect_count');
-        
-        // Show error message to user
-        showMessage('error', 'There was a problem with your authentication state. Please log in again.');
     }
 }
 

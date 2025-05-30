@@ -1,0 +1,17 @@
+/**
+ * Meal Plan View Overlay Styles for Lifestyle Blueprint
+ * 
+ * This stylesheet provides minimal overrides for the meal plan view overlay.
+ * The main styles are inherited from .meal-plan-overlay in meal-plan.css
+ * since the JavaScript applies both classes: 'meal-plan-overlay meal-plan-view-overlay'
+ * 
+ * This ensures perfect visual consistency between the chatbot overlay and view overlay.
+ */
+
+/* The element inherits all styles from .meal-plan-overlay in meal-plan.css */
+/* Only add overrides here if specific view-only adjustments are needed */
+
+.meal-plan-view-overlay {
+  /* Inherits all styles from .meal-plan-overlay */
+  /* This ensures perfect consistency with the chatbot overlay */
+}

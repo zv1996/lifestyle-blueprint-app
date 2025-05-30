@@ -845,6 +845,313 @@ async function getAllUserData(userId, conversationId = null) {
   }
 }
 
+/**
+ * Clone a meal plan and its associated grocery list
+ * @param {string} originalMealPlanId - The ID of the meal plan to clone
+ * @param {string} userId - The user ID (for validation)
+ * @returns {Promise<Object>} The cloned meal plan
+ */
+async function cloneMealPlan(originalMealPlanId, userId) {
+  try {
+    // First, get the original meal plan
+    const originalMealPlan = await getMealPlanById(originalMealPlanId);
+    
+    if (!originalMealPlan) {
+      throw new Error('Original meal plan not found');
+    }
+    
+    // Verify the user owns the original meal plan
+    if (originalMealPlan.user_id !== userId) {
+      throw new Error('User does not have permission to clone this meal plan');
+    }
+    
+    // Generate new ID for the cloned meal plan
+    const newMealPlanId = crypto.randomUUID();
+    
+    // Create the cloned meal plan data
+    const clonedMealPlan = {
+      ...originalMealPlan,
+      meal_plan_id: newMealPlanId,
+      created_at: new Date().toISOString(),
+      based_on_plan_id: originalMealPlanId,
+      is_favorite: false, // Reset favorite status for clones
+      status: 'draft'
+    };
+    
+    // Update the title to indicate it's a clone
+    if (clonedMealPlan.title) {
+      // If title already has clone icon, don't add another one
+      if (!clonedMealPlan.title.startsWith('🔄')) {
+        clonedMealPlan.title = `🔄 ${clonedMealPlan.title}`;
+      }
+    }
+    
+    // Remove the ID from the object before inserting (Supabase will handle it)
+    delete clonedMealPlan.id;
+    
+    // Insert the cloned meal plan
+    const { data: newMealPlan, error: mealPlanError } = await supabase
+      .from('meal_plans')
+      .insert(clonedMealPlan)
+      .select()
+      .single();
+    
+    if (mealPlanError) {
+      throw mealPlanError;
+    }
+    
+    // Get the original grocery list
+    const originalGroceries = await getGroceryListByMealPlanId(originalMealPlanId);
+    
+    // Clone the grocery list if it exists
+    if (originalGroceries && originalGroceries.length > 0) {
+      const clonedGroceries = originalGroceries.map(grocery => ({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        meal_plan_id: newMealPlanId,
+        ingredient_name: grocery.ingredient_name,
+        quantity: grocery.quantity,
+        unit: grocery.unit,
+        category: grocery.category,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        conversation_id: null // Cloned grocery lists don't need conversation_id
+      }));
+      
+      // Insert the cloned groceries
+      const { error: groceryError } = await supabase
+        .from('groceries')
+        .insert(clonedGroceries);
+      
+      if (groceryError) {
+        // If grocery insertion fails, we should clean up the meal plan
+        await supabase
+          .from('meal_plans')
+          .delete()
+          .eq('meal_plan_id', newMealPlanId);
+        
+        throw groceryError;
+      }
+    }
+    
+    console.log('Successfully cloned meal plan:', newMealPlan);
+    return newMealPlan;
+  } catch (error) {
+    console.error('Error cloning meal plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generate a unique share token
+ * @returns {string} A URL-safe share token
+ */
+function generateShareToken() {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+/**
+ * Create a shareable link for a meal plan
+ * @param {string} mealPlanId - The meal plan ID to share
+ * @param {string} userId - The user ID (for validation)
+ * @returns {Promise<Object>} The share data with token
+ */
+async function createMealPlanShare(mealPlanId, userId) {
+  try {
+    // First, verify the user owns the meal plan
+    const mealPlan = await getMealPlanById(mealPlanId);
+    
+    if (!mealPlan) {
+      throw new Error('Meal plan not found');
+    }
+    
+    if (mealPlan.user_id !== userId) {
+      throw new Error('User does not have permission to share this meal plan');
+    }
+    
+    // Generate a unique share token
+    let shareToken;
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    do {
+      shareToken = generateShareToken();
+      
+      // Check if this token already exists
+      const { data: existingShare } = await supabase
+        .from('shared_meal_plans')
+        .select('share_token')
+        .eq('share_token', shareToken)
+        .eq('is_active', true)
+        .limit(1);
+      
+      if (!existingShare || existingShare.length === 0) {
+        break; // Token is unique
+      }
+      
+      attempts++;
+    } while (attempts < maxAttempts);
+    
+    if (attempts >= maxAttempts) {
+      throw new Error('Unable to generate unique share token');
+    }
+    
+    // Check if there's already an active share for this meal plan
+    const { data: existingActiveShare } = await supabase
+      .from('shared_meal_plans')
+      .select('*')
+      .eq('meal_plan_id', mealPlanId)
+      .eq('is_active', true)
+      .limit(1);
+    
+    // If an active share exists, return it instead of creating a new one
+    if (existingActiveShare && existingActiveShare.length > 0) {
+      return {
+        shareToken: existingActiveShare[0].share_token,
+        shareUrl: `/s/${existingActiveShare[0].share_token}`,
+        expiresAt: existingActiveShare[0].expires_at
+      };
+    }
+    
+    // Create the share record
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days from now
+    
+    const shareData = {
+      meal_plan_id: mealPlanId,
+      user_id: userId,
+      share_token: shareToken,
+      created_at: new Date().toISOString(),
+      expires_at: expiresAt.toISOString(),
+      is_active: true
+    };
+    
+    const { data, error } = await supabase
+      .from('shared_meal_plans')
+      .insert(shareData)
+      .select()
+      .single();
+    
+    if (error) {
+      throw error;
+    }
+    
+    console.log('Created meal plan share:', data);
+    
+    return {
+      shareToken: data.share_token,
+      shareUrl: `/s/${data.share_token}`,
+      expiresAt: data.expires_at
+    };
+  } catch (error) {
+    console.error('Error creating meal plan share:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get a shared meal plan by share token
+ * @param {string} shareToken - The share token
+ * @returns {Promise<Object>} The meal plan data
+ */
+async function getSharedMealPlan(shareToken) {
+  try {
+    // First, get the share record
+    const { data: shareData, error: shareError } = await supabase
+      .from('shared_meal_plans')
+      .select('*')
+      .eq('share_token', shareToken)
+      .eq('is_active', true)
+      .single();
+    
+    if (shareError) {
+      if (shareError.code === 'PGRST116') {
+        throw new Error('Share link not found or expired');
+      }
+      throw shareError;
+    }
+    
+    // Check if the share has expired
+    const now = new Date();
+    const expiresAt = new Date(shareData.expires_at);
+    
+    if (now > expiresAt) {
+      // Mark as inactive and throw error
+      await supabase
+        .from('shared_meal_plans')
+        .update({ is_active: false })
+        .eq('id', shareData.id);
+      
+      throw new Error('Share link has expired');
+    }
+    
+    // Get the meal plan
+    const mealPlan = await getMealPlanById(shareData.meal_plan_id);
+    
+    if (!mealPlan) {
+      throw new Error('Meal plan not found');
+    }
+    
+    // Return the meal plan data
+    return {
+      mealPlan,
+      shareInfo: {
+        shareToken: shareData.share_token,
+        createdAt: shareData.created_at,
+        expiresAt: shareData.expires_at
+      }
+    };
+  } catch (error) {
+    console.error('Error getting shared meal plan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the shopping list for a shared meal plan
+ * @param {string} shareToken - The share token
+ * @returns {Promise<Array>} The grocery list
+ */
+async function getSharedMealPlanGroceries(shareToken) {
+  try {
+    // First, get the share record to get the meal plan ID
+    const { data: shareData, error: shareError } = await supabase
+      .from('shared_meal_plans')
+      .select('meal_plan_id, expires_at')
+      .eq('share_token', shareToken)
+      .eq('is_active', true)
+      .single();
+    
+    if (shareError) {
+      if (shareError.code === 'PGRST116') {
+        throw new Error('Share link not found or expired');
+      }
+      throw shareError;
+    }
+    
+    // Check if the share has expired
+    const now = new Date();
+    const expiresAt = new Date(shareData.expires_at);
+    
+    if (now > expiresAt) {
+      throw new Error('Share link has expired');
+    }
+    
+    // Get the groceries for this meal plan
+    const groceries = await getGroceryListByMealPlanId(shareData.meal_plan_id);
+    
+    return groceries;
+  } catch (error) {
+    console.error('Error getting shared meal plan groceries:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   getUserById,
   getUserMetricsAndGoals,
@@ -864,5 +1171,9 @@ module.exports = {
   finalizeMealPlan,
   storeConversationMessage,
   getAllUserData,
+  cloneMealPlan,
+  createMealPlanShare,
+  getSharedMealPlan,
+  getSharedMealPlanGroceries,
   supabase // Export the Supabase client for testing
 };

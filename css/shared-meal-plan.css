@@ -1,0 +1,243 @@
+/* Shared Meal Plan Page Styles */
+
+.shared-meal-plan-header {
+  text-align: center;
+  padding: 4rem 1rem 3rem;
+  background: radial-gradient(circle at center, rgba(0, 229, 255, 0.15) 0%, rgba(10, 14, 20, 0) 70%);
+  position: relative;
+}
+
+.shared-meal-plan-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    rgba(0, 229, 255, 0) 0%, 
+    rgba(0, 229, 255, 0.5) 50%, 
+    rgba(0, 229, 255, 0) 100%);
+}
+
+.meal-plan-title-container h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.nutrition-summary {
+  margin-top: 1.5rem;
+}
+
+.nutrition-stats {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  background: var(--background-card);
+  padding: 1.5rem 2rem;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  max-width: 600px;
+  margin: 0 auto;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.nutrition-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.nutrition-stat .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 0.25rem;
+}
+
+.nutrition-stat .stat-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.nutrition-divider {
+  color: var(--text-secondary);
+  font-weight: 300;
+  font-size: 1.2rem;
+  opacity: 0.5;
+}
+
+/* Shared CTA Section */
+.shared-cta-section {
+  background: linear-gradient(135deg, var(--background-card) 0%, var(--background-light) 100%);
+  padding: 4rem 2rem;
+  text-align: center;
+  border-top: 1px solid var(--border-color);
+  margin-top: 3rem;
+}
+
+.cta-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.cta-content h3 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  background: linear-gradient(to right, var(--gradient-start), var(--gradient-end));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.cta-content p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  color: var(--text-primary);
+  text-decoration: none;
+  padding: 1rem 2rem;
+  border-radius: 50px;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-button::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0) 0%, 
+    rgba(255, 255, 255, 0.1) 50%, 
+    rgba(255, 255, 255, 0) 100%);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.cta-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3), 0 0 15px var(--shadow-color);
+}
+
+.cta-button:hover::after {
+  transform: translateX(100%);
+}
+
+.cta-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Error and loading states */
+.error-message {
+  text-align: center;
+  padding: 3rem;
+  color: #ff5252;
+  font-size: 1.1rem;
+  background: var(--background-card);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 82, 82, 0.2);
+  margin: 2rem 0;
+}
+
+.no-items {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Nutrition info in meal cards */
+.nutrition-info {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--background-light);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .shared-meal-plan-header {
+    padding: 3rem 1rem 2rem;
+  }
+  
+  .meal-plan-title-container h1 {
+    font-size: 2rem;
+  }
+  
+  .nutrition-stats {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  
+  .nutrition-divider {
+    display: none;
+  }
+  
+  .cta-content h3 {
+    font-size: 1.75rem;
+  }
+  
+  .cta-content p {
+    font-size: 1rem;
+  }
+  
+  .shared-cta-section {
+    padding: 3rem 1.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .meal-plan-title-container h1 {
+    font-size: 1.75rem;
+  }
+  
+  .nutrition-stat .stat-value {
+    font-size: 1.25rem;
+  }
+  
+  .nutrition-stat .stat-label {
+    font-size: 0.8rem;
+  }
+  
+  .cta-content h3 {
+    font-size: 1.5rem;
+  }
+  
+  .cta-button {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+}

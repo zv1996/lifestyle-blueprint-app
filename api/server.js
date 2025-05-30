@@ -9,6 +9,7 @@ require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const path = require('path');
 const webhookHandler = require('./webhooks/handler');
 const openaiClient = require('./openai/client');
 const dbClient = require('./database/client');
@@ -300,8 +301,118 @@ app.get('/api/meal-plan/:mealPlanId/groceries', async (req, res) => {
 // Import shopping list routes
 const shoppingListRoutes = require('./routes/shopping-list');
 
+// Import meal plan routes
+const mealPlanRoutes = require('./routes/meal-plan');
+
 // Use shopping list routes
 app.use('/api/shopping-list', shoppingListRoutes);
+
+// Use meal plan routes
+app.use('/api/meal-plan', mealPlanRoutes);
+
+// Public API endpoints for shared meal plans (no authentication required)
+app.get('/api/shared/:shareToken', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+    
+    if (!shareToken) {
+      return res.status(400).json({ error: 'Share token is required' });
+    }
+    
+    console.log('Getting shared meal plan for token:', shareToken);
+    
+    // Get the shared meal plan
+    const sharedData = await dbClient.getSharedMealPlan(shareToken);
+    
+    res.json({
+      success: true,
+      mealPlan: sharedData.mealPlan,
+      shareInfo: sharedData.shareInfo
+    });
+  } catch (error) {
+    console.error('Error getting shared meal plan:', error);
+    
+    if (error.message === 'Share link not found or expired' || error.message === 'Share link has expired') {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Failed to load shared meal plan' });
+  }
+});
+
+app.get('/api/shared/:shareToken/shopping-list', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+    
+    if (!shareToken) {
+      return res.status(400).json({ error: 'Share token is required' });
+    }
+    
+    console.log('Getting shared shopping list for token:', shareToken);
+    
+    // Get the shared shopping list
+    let groceries = await dbClient.getSharedMealPlanGroceries(shareToken);
+    
+    // If no shopping list exists, generate one on-the-fly
+    if (!groceries || groceries.length === 0) {
+      console.log('No shopping list found, generating on-the-fly for shared meal plan');
+      
+      try {
+        // Get the shared meal plan first
+        const sharedData = await dbClient.getSharedMealPlan(shareToken);
+        const mealPlan = sharedData.mealPlan;
+        
+        if (mealPlan) {
+          // Import the shopping list generator
+          const shoppingListGenerator = require('./openai/shopping-list');
+          
+          // Extract ingredients directly from the meal plan
+          const ingredients = extractIngredientsFromMealPlan(mealPlan);
+          
+          if (ingredients.length > 0) {
+            // Generate shopping list using OpenAI (bypass status check)
+            const shoppingList = await generateShoppingListForShared(ingredients);
+            
+            // Store the generated shopping list in the database
+            if (shoppingList && shoppingList.length > 0) {
+              await dbClient.storeGroceryList(
+                mealPlan.user_id,
+                mealPlan.meal_plan_id,
+                shoppingList,
+                mealPlan.conversation_id
+              );
+              
+              // Return the newly generated shopping list
+              groceries = shoppingList.map(item => ({
+                id: require('crypto').randomUUID(),
+                ingredient_name: item.ingredient_name,
+                quantity: item.quantity,
+                unit: item.unit,
+                category: item.category
+              }));
+            }
+          }
+        }
+      } catch (generationError) {
+        console.error('Error generating shopping list on-the-fly:', generationError);
+        // Continue with empty list rather than failing
+      }
+    }
+    
+    res.json({
+      success: true,
+      items: groceries || []
+    });
+  } catch (error) {
+    console.error('Error getting shared shopping list:', error);
+    
+    if (error.message === 'Share link not found or expired' || error.message === 'Share link has expired') {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Failed to load shared shopping list' });
+  }
+});
 
 // API endpoint to store a conversation message
 app.post('/api/conversation/message', async (req, res) => {
@@ -574,6 +685,72 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
+// API endpoint to get complete user profile (for preloader)
+app.get('/api/user/complete-profile', async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing user ID in headers' });
+    }
+    
+    console.log('UserDataPreloader: Fetching complete profile for user:', userId);
+    
+    // Get all user data components
+    const [basicInfo, metrics, dietPreferences] = await Promise.all([
+      dbClient.getUserById(userId).catch(() => null),
+      dbClient.getUserMetricsAndGoals(userId).catch(() => null),
+      dbClient.getUserDietAndMealPreferences(userId).catch(() => null)
+    ]);
+    
+    // Check if user exists at all
+    if (!basicInfo && !metrics && !dietPreferences) {
+      return res.status(404).json({ error: 'No user data found' });
+    }
+    
+    // Format response for UserDataPreloader
+    const profileData = {
+      basicInfo: basicInfo ? {
+        first_name: basicInfo.first_name,
+        last_name: basicInfo.last_name,
+        phone_number: basicInfo.phone_number,
+        birth_date: basicInfo.birth_date,
+        biological_sex: basicInfo.biological_sex,
+        lastUpdated: basicInfo.created_at || basicInfo.updated_at
+      } : null,
+      
+      metrics: metrics ? {
+        height_inches: metrics.height_inches,
+        weight_pounds: metrics.weight_pounds,
+        activity_level: metrics.activity_level,
+        health_fitness_goal: metrics.health_fitness_goal,
+        lastUpdated: metrics.created_at || metrics.updated_at
+      } : null,
+      
+      dietPreferences: dietPreferences ? {
+        dietary_restrictions: dietPreferences.dietary_restrictions,
+        dietary_preferences: dietPreferences.dietary_preferences,
+        meal_portion_people_count: dietPreferences.meal_portion_people_count,
+        meal_portion_details: dietPreferences.meal_portion_details,
+        include_snacks: dietPreferences.include_snacks,
+        snack_1: dietPreferences.snack_1,
+        snack_2: dietPreferences.snack_2,
+        include_favorite_meals: dietPreferences.include_favorite_meals,
+        favorite_meal_1: dietPreferences.favorite_meal_1,
+        favorite_meal_2: dietPreferences.favorite_meal_2,
+        lastUpdated: dietPreferences.date_created
+      } : null
+    };
+    
+    console.log('UserDataPreloader: Successfully retrieved profile data');
+    res.json(profileData);
+    
+  } catch (error) {
+    console.error('UserDataPreloader: Error getting complete profile:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // API endpoint to get all user data
 app.get('/api/user/:userId/data', async (req, res) => {
   try {
@@ -592,6 +769,143 @@ app.get('/api/user/:userId/data', async (req, res) => {
     console.error('Error getting user data:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+});
+
+/**
+ * Extract ingredients from a meal plan (helper function for shared shopping list)
+ * @param {Object} mealPlan - The meal plan
+ * @returns {Array} The extracted ingredients
+ */
+function extractIngredientsFromMealPlan(mealPlan) {
+  const ingredients = [];
+  
+  // Process breakfast, lunch, and dinner for each day
+  for (let day = 1; day <= 5; day++) {
+    ['breakfast', 'lunch', 'dinner'].forEach(mealType => {
+      const ingredientsKey = `${mealType}_${day}_ingredients`;
+      
+      if (mealPlan[ingredientsKey]) {
+        let mealIngredients;
+        
+        // Parse ingredients if they're stored as a string
+        if (typeof mealPlan[ingredientsKey] === 'string') {
+          try {
+            mealIngredients = JSON.parse(mealPlan[ingredientsKey]);
+          } catch (e) {
+            console.warn(`Error parsing ingredients for ${mealType} on day ${day}:`, e);
+            mealIngredients = [];
+          }
+        } else {
+          mealIngredients = mealPlan[ingredientsKey];
+        }
+        
+        // Add each ingredient to the list
+        if (Array.isArray(mealIngredients)) {
+          mealIngredients.forEach(ingredient => {
+            ingredients.push({
+              name: ingredient.name,
+              quantity: ingredient.quantity,
+              unit: ingredient.unit,
+              meal: `${mealType} (Day ${day})`
+            });
+          });
+        }
+      }
+    });
+  }
+  
+  return ingredients;
+}
+
+/**
+ * Generate shopping list for shared meal plan (bypasses status check)
+ * @param {Array} ingredients - The ingredients from the meal plan
+ * @returns {Promise<Array>} The generated shopping list
+ */
+async function generateShoppingListForShared(ingredients) {
+  try {
+    const { OpenAI } = require('openai');
+    
+    // Initialize OpenAI API
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    
+    // Create a prompt for OpenAI
+    const ingredientsList = ingredients.map(ingredient => {
+      return `- ${ingredient.quantity} ${ingredient.unit} ${ingredient.name} (for ${ingredient.meal})`;
+    }).join('\n');
+    
+    const prompt = `
+Create a consolidated shopping list from these meal plan ingredients:
+
+${ingredientsList}
+
+IMPORTANT INSTRUCTIONS:
+1. Combine similar ingredients (e.g., all rice becomes one entry with total quantity)
+2. Use ONLY these categories: Produce, Meat, Dairy, Pantry
+3. Standardize units (e.g., convert small amounts to teaspoons/tablespoons, use grams for most weights)
+4. Keep the list concise - aim for 30-40 items maximum by combining similar items
+
+RESPONSE FORMAT:
+Return ONLY a JSON array with this structure:
+[
+  {
+    "ingredient_name": "Ingredient name",
+    "quantity": numeric_quantity,
+    "unit": "unit",
+    "category": "category"
+  }
+]
+
+CRITICAL: Your response must be ONLY the JSON array with no additional text, markdown formatting, or code blocks.
+`;
+    
+    // Call OpenAI API
+    const response = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful assistant that creates organized shopping lists based on meal plan ingredients. You consolidate similar ingredients, categorize them, and format the output as JSON. Your response should ONLY contain a valid JSON array with no additional text, comments, or code blocks.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000
+    });
+    
+    // Parse the response
+    const content = response.choices[0].message.content.trim();
+    
+    // Try to parse the content as JSON
+    let shoppingList;
+    try {
+      shoppingList = JSON.parse(content);
+    } catch (directParseError) {
+      // Extract the JSON part if direct parsing fails
+      const jsonMatch = content.match(/\[([\s\S]*?)\]/);
+      if (jsonMatch) {
+        shoppingList = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('Failed to parse shopping list from OpenAI response');
+      }
+    }
+    
+    return shoppingList;
+  } catch (error) {
+    console.error('Error generating shopping list for shared meal plan:', error);
+    throw error;
+  }
+}
+
+// Serve shared meal plan page for /s/{token} URLs
+app.get('/s/:token', (req, res) => {
+  console.log('Serving shared meal plan page for token:', req.params.token);
+  res.sendFile(path.join(__dirname, '..', 'shared-meal-plan.html'));
 });
 
 // Start the server

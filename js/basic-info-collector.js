@@ -7,6 +7,7 @@
 
 import config from './config.js';
 import { getCurrentUser } from './auth.js';
+import userDataPreloader from './user-data-preloader.js';
 
 // Basic info collection states
 const STATES = {
@@ -122,9 +123,74 @@ function initBasicInfoCollector(elements) {
 /**
  * Handle the start button click
  */
-function handleStartButton() {
-  // Hide the start button
+async function handleStartButton() {
+  // Hide the start button immediately
   hideStartButton();
+  
+  // Feature flag for preloading (easy to disable if needed)
+  const ENABLE_PRELOADING = true;
+  
+  if (ENABLE_PRELOADING) {
+    try {
+      // Show loading state
+      addBotMessage('Let me check your information...');
+      
+      // Try to fetch existing user data
+      const userProfile = await userDataPreloader.getCompleteProfile();
+      
+      console.log('UserDataPreloader result:', userProfile);
+      
+      // Check if basic info is complete
+      if (userProfile && userProfile.basicInfo && userProfile.basicInfo.isComplete) {
+        // Returning user with complete basic info
+        const basicInfo = userProfile.basicInfo.data;
+        const firstName = basicInfo.first_name;
+        
+        // Populate current state with existing data
+        currentState.data = {
+          firstName: basicInfo.first_name,
+          lastName: basicInfo.last_name,
+          phoneNumber: basicInfo.phone_number,
+          birthDate: basicInfo.birth_date,
+          biologicalSex: basicInfo.biological_sex
+        };
+        
+        // Show sophisticated welcome back message
+        addBotMessage(`Welcome back, ${firstName}! We have your information on file.`);
+        
+        // Automatically complete this stage and move to next
+        currentState.state = STATES.COMPLETE;
+        
+        // Trigger the transition to next stage after a brief delay
+        setTimeout(() => {
+          addBotMessage("Now, let's talk about your health metrics and fitness goals.");
+          
+          // Dispatch event to move to metrics stage
+          const event = new CustomEvent('basicInfoComplete');
+          document.dispatchEvent(event);
+        }, 1000);
+        
+        return;
+      }
+      
+      // If we get here, user has no basic info or incomplete data
+      console.log('No complete basic info found, starting normal flow');
+      
+    } catch (error) {
+      console.warn('UserDataPreloader failed, falling back to normal flow:', error);
+      // Continue to normal flow below
+    }
+  }
+  
+  // Original flow (fallback or new users)
+  startOriginalFlow();
+}
+
+/**
+ * Start the original question flow (preserved for fallback)
+ */
+function startOriginalFlow() {
+  console.log('Starting original basic info collection flow');
   
   // Move to the name state
   currentState.state = STATES.NAME;
